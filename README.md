@@ -375,5 +375,17 @@ This project is licensed under the [MIT License](LICENSE).
 
 Developed for **Smart India Hackathon (SIH 26123)** — *Autonomous Fleet Coordination in Modern Warehouses*.
 Special thanks to the open-source communities behind Three.js, React Three Fiber, and FastAPI.
-#   F l e e t - I n - M o t i o n  
- 
+
+
+---
+
+## Phase 5: Warehouse #3 — Automated Cross-Dock & ASRS Campus
+
+Warehouse #3 is a 36×24 blueprint-inspired automated campus with opposing inbound/outbound
+docks, west storage banks, a central ASRS core and ring corridors, sortation, a central charging
+court, east fulfillment cells, maintenance, dispatch buffering, and reverse logistics. It is loaded
+through the same warehouse compiler and uses the same robot intelligence as Warehouses #1 and #2.
+
+Select **WH #3 · ASRS Campus 36×24** under **Facility Topology** in the dashboard. The measured
+Phase 5 topology and deterministic simulation baseline are preserved in
+[`PHASE5_WAREHOUSE3.md`](PHASE5_WAREHOUSE3.md).

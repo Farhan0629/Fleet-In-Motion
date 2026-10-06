@@ -165,3 +165,12 @@ Two small edits keep the docs honest:
    (`RECEIVE → PUTAWAY → STORE`, then `PICK → PACK → DISPATCH`), and there is a third drill:
    *Force low battery* → watch the unit claim a pad over the mesh, hand its package back, dock and
    resume.
+
+---
+
+## Phase 5 — Warehouse #3
+
+Added the declarative 36×24 Automated Cross-Dock & ASRS Campus, generic north/south dock asset
+orientation, a third facility selector, deterministic Warehouse #3 regression metrics, and the
+Phase 5 validation report. Existing Warehouse #1/#2 definitions, robot coordination algorithms,
+and benchmark baselines remain unchanged.

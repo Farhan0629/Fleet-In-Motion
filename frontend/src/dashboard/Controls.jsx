@@ -3,6 +3,11 @@ import { sendCommand } from '../websocket'
 import useStore from '../store'
 
 const BUTTON = 'min-h-11 rounded-md border px-3 text-sm font-medium transition'
+const WAREHOUSES = [
+  { id: 'warehouse_1', label: 'WH #1', detail: 'Standard 20×20' },
+  { id: 'warehouse_2', label: 'WH #2', detail: 'Smart Hub 28×16' },
+  { id: 'warehouse_3', label: 'WH #3', detail: 'ASRS Campus 36×24' },
+]
 
 export default function Controls() {
   const connected = useStore((s) => s.connected)
@@ -40,23 +45,20 @@ export default function Controls() {
     <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Facility Topology</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={!connected || (sim.running && !sim.paused)}
-            onClick={() => sendSafe('switch_warehouse', { warehouse_id: 'warehouse_1' })}
-            className={`${BUTTON} text-xs ${(warehouse?.id === 'warehouse_1' || (!warehouse?.id && warehouse?.width === 20)) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
-          >
-            WH #1: Standard 20×20
-          </button>
-          <button
-            type="button"
-            disabled={!connected || (sim.running && !sim.paused)}
-            onClick={() => sendSafe('switch_warehouse', { warehouse_id: 'warehouse_2' })}
-            className={`${BUTTON} text-xs ${(warehouse?.id === 'warehouse_2' || warehouse?.width === 28) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
-          >
-            WH #2: Smart Hub 28×16
-          </button>
+        <div className="grid grid-cols-3 gap-2">
+          {WAREHOUSES.map((facility) => {
+            const active = warehouse?.id === facility.id || (!warehouse?.id && facility.id === 'warehouse_1' && warehouse?.width === 20)
+            return <button
+              key={facility.id}
+              type="button"
+              disabled={!connected || (sim.running && !sim.paused)}
+              onClick={() => sendSafe('switch_warehouse', { warehouse_id: facility.id })}
+              className={`${BUTTON} px-2 text-xs ${active ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
+            >
+              <span className="block">{facility.label}</span>
+              <span className="block text-[10px] font-normal leading-tight">{facility.detail}</span>
+            </button>
+          })}
         </div>
       </div>
 

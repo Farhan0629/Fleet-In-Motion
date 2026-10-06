@@ -225,6 +225,7 @@ export default function Warehouse() {
   const markings = warehouse.markings || []
   const hasZones = zones.length > 0
   const enhancedEnvironment = hasZones || exteriorAssets.length > 0
+  const apronOrientations = [...new Set(exteriorAssets.map((asset) => asset.orientation || 'south'))]
 
   return <group>
     {/* Interior clean light-gray concrete warehouse floor */}
@@ -232,11 +233,21 @@ export default function Warehouse() {
       <planeGeometry args={[width + (enhancedEnvironment ? 1.2 : 0.8), height + (enhancedEnvironment ? 1.2 : 0.8)]} />
       <meshStandardMaterial color={enhancedEnvironment ? '#e2e8f0' : '#d5dbd8'} roughness={enhancedEnvironment ? 0.65 : 0.86} metalness={enhancedEnvironment ? 0.08 : 0} />
     </mesh>
-    {/* Exterior logistics asphalt apron outside south dock doors for freight trucks */}
-    {exteriorAssets.length > 0 && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.007, height + 1.8]} receiveShadow>
-      <planeGeometry args={[width + 3.0, 3.8]} />
-      <meshStandardMaterial color="#64748b" roughness={0.88} />
-    </mesh>}
+    {/* Exterior aprons are derived from dock orientation; WH2's south apron is unchanged. */}
+    {apronOrientations.map((orientation) => {
+      const northSouth = orientation === 'north' || orientation === 'south'
+      const position = orientation === 'north'
+        ? [width / 2, -0.007, -1.8]
+        : orientation === 'south'
+          ? [width / 2, -0.007, height + 1.8]
+          : orientation === 'west'
+            ? [-1.8, -0.007, height / 2]
+            : [width + 1.8, -0.007, height / 2]
+      return <mesh key={orientation} rotation={[-Math.PI / 2, 0, 0]} position={position} receiveShadow>
+        <planeGeometry args={northSouth ? [width + 3.0, 3.8] : [3.8, height + 3.0]} />
+        <meshStandardMaterial color="#64748b" roughness={0.88} />
+      </mesh>
+    })}
     {/* Subtle expansion joints on concrete floor */}
     <gridHelper args={enhancedEnvironment ? [gridDimension, gridDimension, '#cbd5e1', '#e2e8f0'] : [20, 20, '#aebbb9', '#c0cbc7']} position={[width / 2, 0.001, height / 2]} />
     {/* Clean off-white / light industrial wall panels */}
@@ -301,7 +312,7 @@ export default function Warehouse() {
     {/* Generic 3D Exterior Assets (Trucks & Dock Doors) */}
     {exteriorAssets.map((asset, i) => {
       if (asset.type === 'freight_truck') {
-        return <FreightTruck key={`truck-${i}`} position={asset.position} color={asset.color} />
+        return <FreightTruck key={`truck-${i}`} position={asset.position} color={asset.color} orientation={asset.orientation} />
       }
       if (asset.type === 'dock_door') {
         return <DockDoor key={`door-${i}`} position={asset.position} orientation={asset.orientation} />

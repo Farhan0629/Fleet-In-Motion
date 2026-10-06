@@ -6,10 +6,16 @@ import Sign from './Signage'
  * 3D Freight delivery trucks parked at outbound dock bays.
  * Scaled and low-profile to support the scene realistically without dominating the foreground.
  */
-export function FreightTruck({ position = [0, 0], color = '#ffffff' }) {
+export function FreightTruck({ position = [0, 0], color = '#ffffff', orientation = 'south' }) {
   const [x, z] = position
+  const transform = {
+    north: { position: [x + 0.5, 0, z - 1.8], rotation: [0, Math.PI, 0] },
+    south: { position: [x + 0.5, 0, z + 1.8], rotation: [0, 0, 0] },
+    east: { position: [x + 1.8, 0, z + 0.5], rotation: [0, Math.PI / 2, 0] },
+    west: { position: [x - 1.8, 0, z + 0.5], rotation: [0, -Math.PI / 2, 0] },
+  }[orientation] || { position: [x + 0.5, 0, z + 1.8], rotation: [0, 0, 0] }
   return (
-    <group position={[x + 0.5, 0, z + 1.8]}>
+    <group position={transform.position} rotation={transform.rotation}>
       {/* Container Trailer Box (docked outside) */}
       <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
         <boxGeometry args={[1.35, 1.55, 2.75]} />
@@ -228,7 +234,13 @@ export function AuxiliaryZone({ zone }) {
   const [minX, minY, maxX, maxY] = zone.bounds
   const cx = (minX + maxX) / 2 + 0.5
   const cz = (minY + maxY) / 2 + 0.5
-  const isPallets = zone.id === 'empty_pallet_zone' || zone.id === 'staging_area'
+  const width = maxX - minX + 1
+  const depth = maxY - minY + 1
+  const visualType = zone.metadata?.visual_type
+  const isPallets = ['pallet_storage', 'dispatch_buffer', 'returns'].includes(visualType)
+    || zone.id === 'empty_pallet_zone'
+    || zone.id === 'staging_area'
+  const isControlRoom = visualType === 'control_room'
 
   return (
     <group position={[cx, 0, cz]}>
@@ -248,6 +260,17 @@ export function AuxiliaryZone({ zone }) {
             ))}
           </group>
         ))
+      ) : isControlRoom ? (
+        <group>
+          <mesh position={[0, 1.1, 0]} castShadow receiveShadow>
+            <boxGeometry args={[Math.min(3.2, width - 0.5), 2.1, Math.min(2.4, depth - 0.5)]} />
+            <meshStandardMaterial color="#e2e8f0" roughness={0.55} metalness={0.15} />
+          </mesh>
+          {[-0.9, 0, 0.9].map((offset) => <mesh key={offset} position={[offset, 1.15, Math.min(1.22, depth / 2)]}>
+            <boxGeometry args={[0.62, 0.38, 0.05]} />
+            <meshBasicMaterial color="#38bdf8" />
+          </mesh>)}
+        </group>
       ) : (
         // QA inspection / packing workbench
         <group>
@@ -283,6 +306,7 @@ export function QuadrantSignAndBollards({ zone }) {
   const [minX, minY, maxX, maxY] = zone.bounds
   const cx = (minX + maxX) / 2 + 0.5
   const cz = (minY + maxY) / 2 + 0.5
+  const isAsrs = zone.metadata?.automation === 'asrs'
 
   const corners = [
     [minX - 0.25, minY - 0.25],
@@ -293,8 +317,24 @@ export function QuadrantSignAndBollards({ zone }) {
 
   return (
     <group position={[0, 0, 0]}>
+      {isAsrs && <group>
+        {[-3.2, 0, 3.2].map((offset) => <group key={offset} position={[cx + offset, 0, cz]}>
+          <mesh position={[0, 2.15, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.3, 4.3, Math.max(3, maxY - minY - 1)]} />
+            <meshStandardMaterial color="#334155" roughness={0.42} metalness={0.55} />
+          </mesh>
+          {[-1.2, -0.4, 0.4, 1.2].map((level) => <mesh key={level} position={[0, 2.15 + level, (maxY - minY) / 2]}>
+            <boxGeometry args={[1.05, 0.12, 0.08]} />
+            <meshBasicMaterial color="#f59e0b" />
+          </mesh>)}
+        </group>)}
+        <mesh position={[cx, 3.7, cz]} castShadow>
+          <boxGeometry args={[8.0, 0.22, 0.5]} />
+          <meshStandardMaterial color="#eab308" metalness={0.55} roughness={0.35} />
+        </mesh>
+      </group>}
       {/* Prominent High-Visibility Overhead Quadrant Sign Badge */}
-      <Sign at={[cx, 3.1, cz]} title={zone.name} tone={zone.color || '#ea580c'} width={2.2} hang={0.65} />
+      <Sign at={[cx, isAsrs ? 5.0 : 3.1, cz]} title={zone.name} tone={zone.color || '#ea580c'} width={isAsrs ? 3.4 : 2.2} hang={0.65} />
       {/* Heavy-Duty Industrial Yellow Safety Bollards at Quadrant Corners */}
       {corners.map(([bx, bz], bi) => (
         <group key={bi} position={[bx + 0.5, 0, bz + 0.5]}>

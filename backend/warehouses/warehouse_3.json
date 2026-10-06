@@ -1,0 +1,880 @@
+{
+  "id": "warehouse_3",
+  "name": "Automated Cross-Dock & ASRS Campus",
+  "version": "3.0.0",
+  "description": "Blueprint-inspired automated warehouse with opposing inbound/outbound docks, west high-density storage, central ASRS ring corridors, sortation, charging court, east fulfillment cells, maintenance, dispatch buffer, and reverse logistics.",
+  "dimensions": {
+    "width": 36,
+    "height": 24,
+    "cell_size": 1.0
+  },
+  "theme": "automated_campus",
+  "layout": [
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+    "W..P....P....P........P....P....P..W",
+    "W..................................W",
+    "W............................WWWWW.W",
+    "W..##..##....................WWWWW.W",
+    "W..##..##....................WWWWW.W",
+    "W..##..##..........................W",
+    "W..##..##..........................W",
+    "W............#.WWWWWW.#...##..##...W",
+    "W............#.WWWWWW.#...##..##...W",
+    "W............#.WWWWWW.#...##..##...W",
+    "W..##..##....#.WWWWWW.#...##..##...W",
+    "W..##..##....#.WWWWWW.#............W",
+    "W..##..##....#.WWWWWW.#............W",
+    "W..##..##..........................W",
+    "W..................................W",
+    "W.............C.C.C.C..............W",
+    "W.............C.C.C.C..............W",
+    "W..................................W",
+    "W..................................W",
+    "W..................................W",
+    "W..................................W",
+    "W..D....D....D........D....D....D..W",
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+  ],
+  "metadata": {
+    "author": "SIH 26123 Team",
+    "created_at": "2026-10-06",
+    "facility_type": "automated_cross_dock_asrs",
+    "unit": "meter"
+  },
+  "operational_settings": {
+    "target_islands": [
+      0,
+      2,
+      4,
+      5
+    ],
+    "default_num_robots": 3,
+    "robot_starts": [
+      [
+        1,
+        3
+      ],
+      [
+        10,
+        18
+      ],
+      [
+        34,
+        18
+      ],
+      [
+        1,
+        20
+      ],
+      [
+        34,
+        20
+      ],
+      [
+        18,
+        3
+      ]
+    ]
+  },
+  "stations": [
+    {
+      "id": 0,
+      "code": "IN-01",
+      "cell": [
+        3,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 1,
+      "code": "IN-02",
+      "cell": [
+        8,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 2,
+      "code": "IN-03",
+      "cell": [
+        13,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 3,
+      "code": "IN-04",
+      "cell": [
+        22,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 4,
+      "code": "IN-05",
+      "cell": [
+        27,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 5,
+      "code": "IN-06",
+      "cell": [
+        32,
+        1
+      ],
+      "side": "north",
+      "station_type": "pickup"
+    },
+    {
+      "id": 6,
+      "code": "OUT-01",
+      "cell": [
+        3,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    },
+    {
+      "id": 7,
+      "code": "OUT-02",
+      "cell": [
+        8,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    },
+    {
+      "id": 8,
+      "code": "OUT-03",
+      "cell": [
+        13,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    },
+    {
+      "id": 9,
+      "code": "OUT-04",
+      "cell": [
+        22,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    },
+    {
+      "id": 10,
+      "code": "OUT-05",
+      "cell": [
+        27,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    },
+    {
+      "id": 11,
+      "code": "OUT-06",
+      "cell": [
+        32,
+        22
+      ],
+      "side": "south",
+      "station_type": "dropoff"
+    }
+  ],
+  "chargers": [
+    {
+      "id": 0,
+      "code": "CHARGE 1",
+      "cell": [
+        14,
+        16
+      ]
+    },
+    {
+      "id": 1,
+      "code": "CHARGE 2",
+      "cell": [
+        16,
+        16
+      ]
+    },
+    {
+      "id": 2,
+      "code": "CHARGE 3",
+      "cell": [
+        18,
+        16
+      ]
+    },
+    {
+      "id": 3,
+      "code": "CHARGE 4",
+      "cell": [
+        20,
+        16
+      ]
+    },
+    {
+      "id": 4,
+      "code": "CHARGE 5",
+      "cell": [
+        14,
+        17
+      ]
+    },
+    {
+      "id": 5,
+      "code": "CHARGE 6",
+      "cell": [
+        16,
+        17
+      ]
+    },
+    {
+      "id": 6,
+      "code": "CHARGE 7",
+      "cell": [
+        18,
+        17
+      ]
+    },
+    {
+      "id": 7,
+      "code": "CHARGE 8",
+      "cell": [
+        20,
+        17
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "id": "inbound_docks",
+      "name": "INBOUND DOCKS",
+      "category": "staging",
+      "bounds": [
+        1,
+        1,
+        34,
+        2
+      ],
+      "color": "#1d4ed8",
+      "metadata": {
+        "flow": "inbound"
+      }
+    },
+    {
+      "id": "receiving_unloading",
+      "name": "RECEIVING & UNLOADING",
+      "category": "auxiliary",
+      "bounds": [
+        24,
+        2,
+        28,
+        5
+      ],
+      "color": "#2563eb",
+      "metadata": {
+        "visual_type": "receiving"
+      }
+    },
+    {
+      "id": "pallet_storage",
+      "name": "PALLET STORAGE",
+      "category": "auxiliary",
+      "bounds": [
+        1,
+        2,
+        9,
+        3
+      ],
+      "color": "#15803d",
+      "metadata": {
+        "visual_type": "pallet_storage"
+      }
+    },
+    {
+      "id": "raw_materials",
+      "name": "RAW MATERIALS",
+      "category": "auxiliary",
+      "bounds": [
+        10,
+        2,
+        14,
+        5
+      ],
+      "color": "#475569",
+      "metadata": {
+        "visual_type": "pallet_storage"
+      }
+    },
+    {
+      "id": "storage_a",
+      "name": "STORAGE ZONE A",
+      "category": "storage",
+      "bounds": [
+        2,
+        4,
+        9,
+        8
+      ],
+      "color": "#ea580c",
+      "metadata": {}
+    },
+    {
+      "id": "storage_b",
+      "name": "STORAGE ZONE B",
+      "category": "storage",
+      "bounds": [
+        2,
+        11,
+        9,
+        15
+      ],
+      "color": "#c2410c",
+      "metadata": {}
+    },
+    {
+      "id": "sortation_induction",
+      "name": "SORTATION & INDUCTION",
+      "category": "sortation",
+      "bounds": [
+        11,
+        3,
+        24,
+        6
+      ],
+      "color": "#7e22ce",
+      "metadata": {}
+    },
+    {
+      "id": "asrs_core",
+      "name": "ASRS \u00b7 AUTOMATED STORAGE",
+      "category": "storage",
+      "bounds": [
+        12,
+        7,
+        23,
+        14
+      ],
+      "color": "#b91c1c",
+      "metadata": {
+        "automation": "asrs"
+      }
+    },
+    {
+      "id": "charging_court",
+      "name": "CHARGING STATION",
+      "category": "charging",
+      "bounds": [
+        12,
+        15,
+        22,
+        18
+      ],
+      "color": "#15803d",
+      "metadata": {}
+    },
+    {
+      "id": "operations_control",
+      "name": "OPERATIONS CONTROL ROOM",
+      "category": "auxiliary",
+      "bounds": [
+        29,
+        3,
+        34,
+        6
+      ],
+      "color": "#334155",
+      "metadata": {
+        "visual_type": "control_room"
+      }
+    },
+    {
+      "id": "qa_inspection",
+      "name": "QA & INSPECTION",
+      "category": "auxiliary",
+      "bounds": [
+        29,
+        6,
+        34,
+        7
+      ],
+      "color": "#1e40af",
+      "metadata": {
+        "visual_type": "workbench"
+      }
+    },
+    {
+      "id": "picking_area",
+      "name": "PICKING AREA",
+      "category": "auxiliary",
+      "bounds": [
+        24,
+        8,
+        28,
+        14
+      ],
+      "color": "#0891b2",
+      "metadata": {
+        "visual_type": "workbench"
+      }
+    },
+    {
+      "id": "packing_area",
+      "name": "PACKING AREA",
+      "category": "auxiliary",
+      "bounds": [
+        29,
+        13,
+        34,
+        17
+      ],
+      "color": "#7e22ce",
+      "metadata": {
+        "visual_type": "workbench"
+      }
+    },
+    {
+      "id": "maintenance_area",
+      "name": "MAINTENANCE AREA",
+      "category": "auxiliary",
+      "bounds": [
+        1,
+        17,
+        8,
+        21
+      ],
+      "color": "#b91c1c",
+      "metadata": {
+        "visual_type": "maintenance"
+      }
+    },
+    {
+      "id": "dispatch_buffer",
+      "name": "DISPATCH BUFFER",
+      "category": "auxiliary",
+      "bounds": [
+        11,
+        19,
+        24,
+        21
+      ],
+      "color": "#334155",
+      "metadata": {
+        "visual_type": "dispatch_buffer"
+      }
+    },
+    {
+      "id": "returns_logistics",
+      "name": "RETURNS & REVERSE LOGISTICS",
+      "category": "auxiliary",
+      "bounds": [
+        27,
+        18,
+        34,
+        21
+      ],
+      "color": "#6d28d9",
+      "metadata": {
+        "visual_type": "returns"
+      }
+    },
+    {
+      "id": "outbound_docks",
+      "name": "OUTBOUND / DISPATCH DOCKS",
+      "category": "staging",
+      "bounds": [
+        1,
+        21,
+        34,
+        22
+      ],
+      "color": "#1e3a8a",
+      "metadata": {
+        "flow": "outbound"
+      }
+    }
+  ],
+  "markings": [
+    {
+      "type": "crosswalk",
+      "start": [
+        1,
+        2
+      ],
+      "end": [
+        34,
+        2
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        1,
+        21
+      ],
+      "end": [
+        34,
+        21
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        10,
+        7
+      ],
+      "end": [
+        25,
+        7
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        10,
+        14
+      ],
+      "end": [
+        25,
+        14
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        11,
+        2
+      ],
+      "end": [
+        11,
+        21
+      ],
+      "direction": "south"
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        24,
+        2
+      ],
+      "end": [
+        24,
+        21
+      ],
+      "direction": "south"
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        1,
+        10
+      ],
+      "end": [
+        34,
+        10
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        11,
+        6
+      ],
+      "end": [
+        11,
+        6
+      ],
+      "direction": "south"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        24,
+        15
+      ],
+      "end": [
+        24,
+        15
+      ],
+      "direction": "south"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        18,
+        20
+      ],
+      "end": [
+        18,
+        20
+      ],
+      "direction": "south"
+    },
+    {
+      "type": "hazard_border",
+      "start": [
+        12,
+        7
+      ],
+      "end": [
+        23,
+        14
+      ],
+      "direction": ""
+    },
+    {
+      "type": "hazard_border",
+      "start": [
+        12,
+        15
+      ],
+      "end": [
+        22,
+        18
+      ],
+      "direction": ""
+    }
+  ],
+  "exterior_assets": [
+    {
+      "type": "dock_door",
+      "position": [
+        3,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        3,
+        0
+      ],
+      "orientation": "north",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        8,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        8,
+        0
+      ],
+      "orientation": "north",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        13,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        13,
+        0
+      ],
+      "orientation": "north",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        22,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        22,
+        0
+      ],
+      "orientation": "north",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        27,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        27,
+        0
+      ],
+      "orientation": "north",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        32,
+        0
+      ],
+      "orientation": "north",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        32,
+        0
+      ],
+      "orientation": "north",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        3,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        3,
+        23
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        8,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        8,
+        23
+      ],
+      "orientation": "south",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        13,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        13,
+        23
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        22,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        22,
+        23
+      ],
+      "orientation": "south",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        27,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        27,
+        23
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        32,
+        23
+      ],
+      "orientation": "south",
+      "color": "#64748b"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        32,
+        23
+      ],
+      "orientation": "south",
+      "color": "#1e3a8a"
+    }
+  ]
+}
