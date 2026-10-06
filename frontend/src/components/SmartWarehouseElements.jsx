@@ -299,6 +299,131 @@ export function AuxiliaryZone({ zone }) {
   )
 }
 
+function AutomatedStorageSystem({ zone }) {
+  const [minX, minY, maxX, maxY] = zone.bounds
+  const cx = (minX + maxX) / 2 + 0.5
+  const cz = (minY + maxY) / 2 + 0.5
+  const zoneWidth = maxX - minX + 1
+  const zoneDepth = maxY - minY + 1
+  const width = Math.min(9.4, zoneWidth - 1.2)
+  const depth = Math.min(5.4, zoneDepth - 1.4)
+  const height = 4.55
+  const bays = 6
+  const levels = 5
+  const bayWidth = width / bays
+  const frontZ = cz + depth / 2
+  const backZ = cz - depth / 2
+  const bayCenters = Array.from({ length: bays }, (_, index) => cx - width / 2 + bayWidth * (index + 0.5))
+  const uprights = Array.from({ length: bays + 1 }, (_, index) => cx - width / 2 + bayWidth * index)
+  const shelfLevels = Array.from({ length: levels }, (_, index) => 0.58 + index * 0.78)
+  const parcelColors = ['#c9965f', '#d4a373', '#b7793f', '#e0b47a']
+
+  const conveyor = (side) => {
+    const length = 3.4
+    const centerX = cx + side * (width / 2 + length / 2)
+    const endX = cx + side * (width / 2 + length)
+    return <group key={side}>
+      <mesh position={[centerX, 2.0, cz]} castShadow receiveShadow>
+        <boxGeometry args={[length, 0.16, 1.05]} />
+        <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.32} />
+      </mesh>
+      {Array.from({ length: 12 }, (_, index) => {
+        const x = centerX - length / 2 + 0.2 + index * ((length - 0.4) / 11)
+        return <mesh key={index} position={[x, 2.11, cz]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.045, 0.045, 0.9, 10]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.82} roughness={0.18} />
+        </mesh>
+      })}
+      {[centerX - length * 0.34, centerX + length * 0.34].map((x) => <group key={x}>
+        {[-0.43, 0.43].map((zOffset) => <mesh key={zOffset} position={[x, 0.98, cz + zOffset]}>
+          <boxGeometry args={[0.09, 1.96, 0.09]} />
+          <meshStandardMaterial color="#475569" metalness={0.65} roughness={0.38} />
+        </mesh>)}
+      </group>)}
+      <mesh position={[endX - side * 0.45, 2.33, cz]} castShadow>
+        <boxGeometry args={[0.58, 0.42, 0.68]} />
+        <meshStandardMaterial color="#c9965f" roughness={0.82} />
+      </mesh>
+    </group>
+  }
+
+  return <group>
+    {/* Reinforced foundation and high-bay rack shell. */}
+    <mesh position={[cx, 0.055, cz]} receiveShadow>
+      <boxGeometry args={[width + 1.4, 0.11, depth + 1.4]} />
+      <meshStandardMaterial color="#64748b" roughness={0.78} metalness={0.2} />
+    </mesh>
+    {[frontZ, backZ].map((faceZ, faceIndex) => <group key={faceZ}>
+      {uprights.map((x) => <mesh key={x} position={[x, height / 2, faceZ]} castShadow>
+        <boxGeometry args={[0.12, height, 0.14]} />
+        <meshStandardMaterial color="#1e3a5f" metalness={0.68} roughness={0.34} />
+      </mesh>)}
+      {shelfLevels.map((level) => <mesh key={level} position={[cx, level, faceZ]}>
+        <boxGeometry args={[width, 0.12, 0.16]} />
+        <meshStandardMaterial color="#f59e0b" metalness={0.48} roughness={0.36} />
+      </mesh>)}
+      {bayCenters.flatMap((x, bay) => shelfLevels.map((level, row) => {
+        const occupied = (bay + row + faceIndex) % 3 !== 1
+        if (!occupied) return null
+        return <mesh key={`${x}-${level}`} position={[x, level + 0.29, faceZ + (faceIndex === 0 ? -0.22 : 0.22)]} castShadow>
+          <boxGeometry args={[bayWidth * 0.66, 0.48, 0.68]} />
+          <meshStandardMaterial color={parcelColors[(bay + row) % parcelColors.length]} roughness={0.8} />
+        </mesh>
+      }))}
+    </group>)}
+    {/* Roof ties make the two storage faces read as one deep automated store. */}
+    {uprights.map((x) => <mesh key={`roof-${x}`} position={[x, height, cz]}>
+      <boxGeometry args={[0.12, 0.12, depth]} />
+      <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.3} />
+    </mesh>)}
+    {/* Twin yellow stacker-crane portals and visible lift carriages. */}
+    {[-1, 1].map((side) => {
+      const x = cx + side * (width / 2 + 0.48)
+      return <group key={side}>
+        {[frontZ, backZ].map((z) => <mesh key={z} position={[x, height / 2, z]} castShadow>
+          <boxGeometry args={[0.2, height, 0.2]} />
+          <meshStandardMaterial color="#eab308" metalness={0.58} roughness={0.32} />
+        </mesh>)}
+        <mesh position={[x, height, cz]} castShadow>
+          <boxGeometry args={[0.24, 0.22, depth + 0.25]} />
+          <meshStandardMaterial color="#facc15" metalness={0.55} roughness={0.3} />
+        </mesh>
+        <mesh position={[x - side * 0.18, side < 0 ? 2.65 : 1.75, cz]} castShadow>
+          <boxGeometry args={[0.5, 0.55, 1.08]} />
+          <meshStandardMaterial color="#f59e0b" metalness={0.5} roughness={0.36} />
+        </mesh>
+        <mesh position={[x - side * 0.45, side < 0 ? 2.65 : 1.75, cz]}>
+          <boxGeometry args={[0.42, 0.08, 0.72]} />
+          <meshStandardMaterial color="#facc15" />
+        </mesh>
+      </group>
+    })}
+    {/* Elevated inbound/outbound conveyor bridges. */}
+    {[-1, 1].map(conveyor)}
+    {/* Yellow safety fence across the operator-facing edge. */}
+    {Array.from({ length: 11 }, (_, index) => {
+      const x = cx - (width + 1.0) / 2 + index * ((width + 1.0) / 10)
+      return <mesh key={x} position={[x, 0.55, frontZ + 0.72]}>
+        <boxGeometry args={[0.07, 1.1, 0.07]} />
+        <meshStandardMaterial color="#eab308" roughness={0.35} />
+      </mesh>
+    })}
+    {[0.34, 0.72, 1.04].map((level) => <mesh key={level} position={[cx, level, frontZ + 0.72]}>
+      <boxGeometry args={[width + 1.05, 0.065, 0.065]} />
+      <meshStandardMaterial color="#eab308" roughness={0.35} />
+    </mesh>)}
+    <Sign
+      at={[cx, 5.35, frontZ + 0.35]}
+      title={zone.name}
+      subtitle="High-bay automated storage & retrieval"
+      tone={zone.color || '#b91c1c'}
+      width={4.4}
+      maxWidth={5.2}
+      hang={0.45}
+    />
+  </group>
+}
+
 /**
  * Storage Quadrant Signage & Corner Safety Bollards (RACK A, B, C, D).
  */
@@ -317,24 +442,9 @@ export function QuadrantSignAndBollards({ zone }) {
 
   return (
     <group position={[0, 0, 0]}>
-      {isAsrs && <group>
-        {[-3.2, 0, 3.2].map((offset) => <group key={offset} position={[cx + offset, 0, cz]}>
-          <mesh position={[0, 2.15, 0]} castShadow receiveShadow>
-            <boxGeometry args={[1.3, 4.3, Math.max(3, maxY - minY - 1)]} />
-            <meshStandardMaterial color="#334155" roughness={0.42} metalness={0.55} />
-          </mesh>
-          {[-1.2, -0.4, 0.4, 1.2].map((level) => <mesh key={level} position={[0, 2.15 + level, (maxY - minY) / 2]}>
-            <boxGeometry args={[1.05, 0.12, 0.08]} />
-            <meshBasicMaterial color="#f59e0b" />
-          </mesh>)}
-        </group>)}
-        <mesh position={[cx, 3.7, cz]} castShadow>
-          <boxGeometry args={[8.0, 0.22, 0.5]} />
-          <meshStandardMaterial color="#eab308" metalness={0.55} roughness={0.35} />
-        </mesh>
-      </group>}
+      {isAsrs && <AutomatedStorageSystem zone={zone} />}
       {/* Prominent High-Visibility Overhead Quadrant Sign Badge */}
-      <Sign at={[cx, isAsrs ? 5.0 : 3.1, cz]} title={zone.name} tone={zone.color || '#ea580c'} width={isAsrs ? 3.4 : 2.2} hang={0.65} />
+      {!isAsrs && <Sign at={[cx, 3.1, cz]} title={zone.name} tone={zone.color || '#ea580c'} width={2.2} hang={0.65} />}
       {/* Heavy-Duty Industrial Yellow Safety Bollards at Quadrant Corners */}
       {corners.map(([bx, bz], bi) => (
         <group key={bi} position={[bx + 0.5, 0, bz + 0.5]}>

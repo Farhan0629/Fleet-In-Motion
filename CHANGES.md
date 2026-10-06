@@ -174,3 +174,10 @@ Added the declarative 36×24 Automated Cross-Dock & ASRS Campus, generic north/s
 orientation, a third facility selector, deterministic Warehouse #3 regression metrics, and the
 Phase 5 validation report. Existing Warehouse #1/#2 definitions, robot coordination algorithms,
 and benchmark baselines remain unchanged.
+
+### Phase 5 visual refinement
+
+Replaced the ASRS placeholder slabs with detailed high-bay racks, visible inventory, stacker-crane
+frames, lift carriages, elevated conveyors, and safety fencing. Long in-world labels now
+automatically widen and fit their font sizes instead of clipping. Navigation and simulation logic
+were not changed.

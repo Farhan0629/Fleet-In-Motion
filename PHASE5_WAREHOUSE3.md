@@ -91,3 +91,15 @@ court, and switching back to WH1 or WH2 reloads the original environment.
 This phase is simulation-only. It does not add dynamic runtime task insertion, failure recovery,
 scalability benchmarking, arbitrary floor-plan import, ROS2 integration, or physical robot control.
 Those remain later phases.
+
+## Visual refinement
+
+The ASRS presentation now models a high-bay storage structure rather than solid placeholder towers:
+front and rear shelf grids, occupied storage cells, twin yellow stacker-crane portals and
+carriages, roof ties, elevated roller conveyors, support legs, and an operator-side safety fence.
+This remains presentation geometry only; the compiled navigation map and robot algorithms are
+unchanged.
+
+Shared in-world signage now widens for long titles and fits both title and subtitle fonts to the
+available texture width. Labels such as **ASRS · AUTOMATED STORAGE**, **OUTBOUND / DISPATCH
+DOCKS**, and **RETURNS & REVERSE LOGISTICS** therefore remain complete instead of being clipped.
