@@ -378,14 +378,6 @@ function AutomatedStorageSystem({ zone }) {
           <boxGeometry args={[0.24, 0.22, depth + 0.25]} />
           <meshStandardMaterial color="#facc15" metalness={0.55} roughness={0.3} />
         </mesh>
-        <mesh position={[x - side * 0.18, side < 0 ? 2.65 : 1.75, cz]} castShadow>
-          <boxGeometry args={[0.5, 0.55, 1.08]} />
-          <meshStandardMaterial color="#f59e0b" metalness={0.5} roughness={0.36} />
-        </mesh>
-        <mesh position={[x - side * 0.45, side < 0 ? 2.65 : 1.75, cz]}>
-          <boxGeometry args={[0.42, 0.08, 0.72]} />
-          <meshStandardMaterial color="#facc15" />
-        </mesh>
       </group>
     })}
     {/* Ground-supported transfer decks stay inside the blocked machine core. */}
