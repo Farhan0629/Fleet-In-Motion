@@ -310,31 +310,48 @@ class EnvironmentEngine:
     ) -> None:
         """Validate optional solid-asset footprints declared by semantic zones."""
         for zone in getattr(warehouse, "zones", []):
-            bounds = (zone.get("metadata") or {}).get("navigation_footprint")
-            if bounds is None:
-                continue
-            if not isinstance(bounds, (list, tuple)) or len(bounds) != 4:
+            metadata = zone.get("metadata") or {}
+            single = metadata.get("navigation_footprint")
+            footprints = metadata.get("navigation_footprints")
+            if single is not None and footprints is not None:
                 report.is_valid = False
                 report.errors.append(
-                    f"Zone {zone.get('id', '<unknown>')} navigation_footprint must be [min_x,min_y,max_x,max_y]."
+                    f"Zone {zone.get('id', '<unknown>')} must use navigation_footprint or "
+                    "navigation_footprints, not both."
                 )
                 continue
-            min_x, min_y, max_x, max_y = (int(value) for value in bounds)
-            if min_x > max_x or min_y > max_y or min_x < 0 or min_y < 0 or max_x >= warehouse.width or max_y >= warehouse.height:
+            if footprints is None:
+                footprints = [single] if single is not None else []
+            if not isinstance(footprints, (list, tuple)):
                 report.is_valid = False
                 report.errors.append(
-                    f"Zone {zone.get('id', '<unknown>')} navigation_footprint {bounds} is outside the warehouse."
+                    f"Zone {zone.get('id', '<unknown>')} navigation_footprints must be a list of bounds."
                 )
                 continue
-            leaked = [
-                (x, y)
-                for y in range(min_y, max_y + 1)
-                for x in range(min_x, max_x + 1)
-                if (x, y) in walkable_cells
-            ]
-            if leaked:
-                report.is_valid = False
-                report.errors.append(
-                    f"Zone {zone.get('id', '<unknown>')} solid navigation footprint overlaps "
-                    f"{len(leaked)} walkable cell(s), including {leaked[:4]}."
-                )
+            for bounds in footprints:
+                if not isinstance(bounds, (list, tuple)) or len(bounds) != 4:
+                    report.is_valid = False
+                    report.errors.append(
+                        f"Zone {zone.get('id', '<unknown>')} navigation footprint must be "
+                        "[min_x,min_y,max_x,max_y]."
+                    )
+                    continue
+                min_x, min_y, max_x, max_y = (int(value) for value in bounds)
+                if min_x > max_x or min_y > max_y or min_x < 0 or min_y < 0 or max_x >= warehouse.width or max_y >= warehouse.height:
+                    report.is_valid = False
+                    report.errors.append(
+                        f"Zone {zone.get('id', '<unknown>')} navigation footprint {bounds} is outside the warehouse."
+                    )
+                    continue
+                leaked = [
+                    (x, y)
+                    for y in range(min_y, max_y + 1)
+                    for x in range(min_x, max_x + 1)
+                    if (x, y) in walkable_cells
+                ]
+                if leaked:
+                    report.is_valid = False
+                    report.errors.append(
+                        f"Zone {zone.get('id', '<unknown>')} solid navigation footprint overlaps "
+                        f"{len(leaked)} walkable cell(s), including {leaked[:4]}."
+                    )

@@ -46,17 +46,19 @@ Rack inventory remains physical:
 - table pickup loads that table and empties it when lifting starts;
 - one task cannot claim inventory already claimed by another task.
 
-## ASRS navigation/rendering root fix
+## WH3 physical-clearance contract
 
-The WH3 ASRS semantic zone intentionally includes its surrounding operating area, while its solid
-machine occupies only the central blocked core. The improved visual model had used the broad
-semantic bounds for solid beams, fences, and supports, so valid A* aisle cells visually passed
-through geometry.
+The WH3 semantic zones intentionally include operating and service areas larger than their
+machines. Earlier rendering placed some solid objects across otherwise valid A* aisle cells.
 
-Zones can now declare a generic `metadata.navigation_footprint`. The environment compiler rejects
-any solid footprint containing a walkable cell. The ASRS model derives all solid geometry from
-that footprint, and elevated conveyors no longer place legs in traversable aisles. This is a
-schema/compiler/rendering correction; no Gaurav-, task-, or Warehouse-ID branch was added.
+Zones can declare a rectangular `metadata.navigation_footprint` or multiple
+`metadata.navigation_footprints`. The compiler rejects any declared solid footprint containing a
+walkable cell. Auxiliary models derive their center and size from the same data. The sortation
+loop uses a multipart U-shaped footprint, while the ASRS uses its central machine footprint.
+
+The ASRS transfer decks are ground-supported and contained inside the blocked core. Dock ramps and
+decorative bollards that occupied task/aisle cells were removed. This remains a
+schema/compiler/rendering correction; no robot-, task-, or warehouse-ID branch was added.
 
 ## Verification
 
@@ -74,7 +76,7 @@ npm run build
 
 The regression suite checks the complete dynamic lifecycle, priority ordering, semantic task
 creation in all three warehouses, robot unavailability/re-auction, rack source and destination
-inventory, and zero robot entries into WH3's solid ASRS footprint during the deterministic
+inventory, and zero robot entries into every declared WH3 solid footprint during deterministic
 putaway episodes.
 
 ## Scope boundary

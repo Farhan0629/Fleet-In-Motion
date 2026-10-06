@@ -56,8 +56,18 @@ def run_putaway_episode(seed: int = 0) -> dict:
         "messages": 0,
         "solid_footprint_entries": 0,
     }
-    asrs = next(zone for zone in warehouse.zones if zone["id"] == "asrs_core")
-    min_x, min_y, max_x, max_y = asrs["metadata"]["navigation_footprint"]
+    solid_cells = set()
+    for zone in warehouse.zones:
+        metadata = zone.get("metadata") or {}
+        footprints = metadata.get("navigation_footprints")
+        if footprints is None and metadata.get("navigation_footprint") is not None:
+            footprints = [metadata["navigation_footprint"]]
+        for min_x, min_y, max_x, max_y in footprints or []:
+            solid_cells.update(
+                (x, y)
+                for y in range(min_y, max_y + 1)
+                for x in range(min_x, max_x + 1)
+            )
     for tick in range(1, 1201):
         tasks.allocate_tasks(fleet, network, None, tick)
         for robot in fleet:
@@ -71,7 +81,7 @@ def run_putaway_episode(seed: int = 0) -> dict:
                 tasks.note_pickup(robot.current_task["id"])
             elif action == "delivered" and robot.last_delivered_task_id:
                 tasks.complete_leg(robot.last_delivered_task_id)
-            if min_x <= robot.x <= max_x and min_y <= robot.y <= max_y:
+            if (robot.x, robot.y) in solid_cells:
                 result["solid_footprint_entries"] += 1
 
         result["same_cell_collisions"] += len(detect_collisions(fleet))
@@ -136,6 +146,31 @@ class Warehouse3Tests(unittest.TestCase):
             slot = warehouse.get_slot(task.slot_id)
             self.assertIn(tuple(task.destination), [tuple(item["cell"]) for item in warehouse.rack_slots])
             self.assertIn(tuple(task.dropoff), warehouse.rack_access_cells(slot["cell"]))
+
+    def test_every_custom_solid_is_declared_and_blocked(self):
+        warehouse, report = EnvironmentEngine.compile_file(SCHEMA_DIR / "warehouse_3.json")
+        self.assertTrue(report.is_valid, report.summary())
+        solid_visuals = {
+            "receiving_unloading", "pallet_storage", "raw_materials",
+            "sortation_induction", "asrs_core", "operations_control",
+            "qa_inspection", "picking_area", "packing_area",
+            "maintenance_area", "dispatch_buffer", "returns_logistics",
+        }
+        for zone in warehouse.zones:
+            if zone["id"] not in solid_visuals:
+                continue
+            metadata = zone.get("metadata") or {}
+            footprints = metadata.get("navigation_footprints")
+            if footprints is None and metadata.get("navigation_footprint") is not None:
+                footprints = [metadata["navigation_footprint"]]
+            self.assertTrue(footprints, f"{zone['id']} has no physical footprint")
+            for min_x, min_y, max_x, max_y in footprints:
+                for y in range(min_y, max_y + 1):
+                    for x in range(min_x, max_x + 1):
+                        self.assertFalse(
+                            warehouse.is_walkable(x, y),
+                            f"{zone['id']} leaves solid cell {(x, y)} walkable",
+                        )
 
     def test_deterministic_three_episode_baseline(self):
         results = [run_putaway_episode(seed) for seed in (501, 502, 503)]

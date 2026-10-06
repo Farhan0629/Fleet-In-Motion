@@ -1,7 +1,7 @@
 {
   "id": "warehouse_3",
   "name": "Automated Cross-Dock & ASRS Campus",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "description": "Blueprint-inspired automated warehouse with opposing inbound/outbound docks, west high-density storage, central ASRS ring corridors, sortation, charging court, east fulfillment cells, maintenance, dispatch buffer, and reverse logistics.",
   "dimensions": {
     "width": 36,
@@ -12,25 +12,25 @@
   "layout": [
     "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
     "W..P....P....P........P....P....P..W",
-    "W..................................W",
-    "W............................WWWWW.W",
-    "W..##..##....................WWWWW.W",
-    "W..##..##....................WWWWW.W",
-    "W..##..##..........................W",
-    "W..##..##..........................W",
+    "W....W.............................W",
+    "W....W.....WW..........WW.W..WWWWW.W",
+    "W..##..##..WW..........WW.W..WWWWW.W",
+    "W..##..##..WW..........WW....WWWWW.W",
+    "W..##..##..WWWWWWWWWWWWWW......WW..W",
+    "W..##..##......................WW..W",
     "W............#.WWWWWW.#...##..##...W",
     "W............#.WWWWWW.#...##..##...W",
     "W............#.WWWWWW.#...##..##...W",
     "W..##..##....#.WWWWWW.#...##..##...W",
     "W..##..##....#.WWWWWW.#............W",
-    "W..##..##....#.WWWWWW.#............W",
-    "W..##..##..........................W",
-    "W..................................W",
+    "W..##..##....#.WWWWWW.#...WW.......W",
+    "W..##..##.................WW...WW..W",
+    "W..............................WW..W",
     "W.............C.C.C.C..............W",
     "W.............C.C.C.C..............W",
-    "W..................................W",
-    "W..................................W",
-    "W..................................W",
+    "W...WW.............................W",
+    "W...WW...........WW...........WW...W",
+    "W................WW...........WW...W",
     "W..................................W",
     "W..D....D....D........D....D....D..W",
     "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"
@@ -292,7 +292,13 @@
       ],
       "color": "#2563eb",
       "metadata": {
-        "visual_type": "receiving"
+        "visual_type": "receiving",
+        "navigation_footprint": [
+          26,
+          3,
+          26,
+          4
+        ]
       }
     },
     {
@@ -307,7 +313,13 @@
       ],
       "color": "#15803d",
       "metadata": {
-        "visual_type": "pallet_storage"
+        "visual_type": "pallet_storage",
+        "navigation_footprint": [
+          5,
+          2,
+          5,
+          3
+        ]
       }
     },
     {
@@ -322,7 +334,13 @@
       ],
       "color": "#475569",
       "metadata": {
-        "visual_type": "pallet_storage"
+        "visual_type": "pallet_storage",
+        "navigation_footprint": [
+          12,
+          3,
+          12,
+          4
+        ]
       }
     },
     {
@@ -362,7 +380,28 @@
         6
       ],
       "color": "#7e22ce",
-      "metadata": {}
+      "metadata": {
+        "navigation_footprints": [
+          [
+            11,
+            3,
+            12,
+            6
+          ],
+          [
+            23,
+            3,
+            24,
+            6
+          ],
+          [
+            13,
+            6,
+            22,
+            6
+          ]
+        ]
+      }
     },
     {
       "id": "asrs_core",
@@ -410,7 +449,13 @@
       ],
       "color": "#334155",
       "metadata": {
-        "visual_type": "control_room"
+        "visual_type": "control_room",
+        "navigation_footprint": [
+          29,
+          3,
+          33,
+          5
+        ]
       }
     },
     {
@@ -425,7 +470,13 @@
       ],
       "color": "#1e40af",
       "metadata": {
-        "visual_type": "workbench"
+        "visual_type": "workbench",
+        "navigation_footprint": [
+          31,
+          6,
+          32,
+          7
+        ]
       }
     },
     {
@@ -440,7 +491,13 @@
       ],
       "color": "#0891b2",
       "metadata": {
-        "visual_type": "workbench"
+        "visual_type": "workbench",
+        "navigation_footprint": [
+          26,
+          13,
+          27,
+          14
+        ]
       }
     },
     {
@@ -455,7 +512,13 @@
       ],
       "color": "#7e22ce",
       "metadata": {
-        "visual_type": "workbench"
+        "visual_type": "workbench",
+        "navigation_footprint": [
+          31,
+          14,
+          32,
+          15
+        ]
       }
     },
     {
@@ -470,7 +533,13 @@
       ],
       "color": "#b91c1c",
       "metadata": {
-        "visual_type": "maintenance"
+        "visual_type": "maintenance",
+        "navigation_footprint": [
+          4,
+          18,
+          5,
+          19
+        ]
       }
     },
     {
@@ -485,7 +554,13 @@
       ],
       "color": "#334155",
       "metadata": {
-        "visual_type": "dispatch_buffer"
+        "visual_type": "dispatch_buffer",
+        "navigation_footprint": [
+          17,
+          19,
+          18,
+          20
+        ]
       }
     },
     {
@@ -500,7 +575,13 @@
       ],
       "color": "#6d28d9",
       "metadata": {
-        "visual_type": "returns"
+        "visual_type": "returns",
+        "navigation_footprint": [
+          30,
+          19,
+          31,
+          20
+        ]
       }
     },
     {

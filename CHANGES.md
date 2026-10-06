@@ -194,3 +194,15 @@ rack slots, so the same lifecycle works in Warehouses #1, #2, and #3.
 Also corrected the WH3 ASRS render/navigation mismatch with a compiler-validated generic solid
 navigation footprint. No robot-specific or warehouse-ID-specific coordination branch was added.
 See `PHASE6_DYNAMIC_TASKS.md` for behavior, tests, and limitations.
+
+### Warehouse #3 full physical-clearance audit
+
+Extended the footprint contract to multipart machinery and applied it to every custom solid in
+WH3. The navigation grid now blocks the sortation conveyor, ASRS core, workbenches, pallet stacks,
+control room, maintenance station, dispatch buffer, and returns station. Rendering uses those same
+footprints. Unsupported elevated ASRS conveyors were replaced with grounded transfer decks inside
+the machine core; dock ramps and aisle bollards were removed.
+
+The corrected topology remains connected. Three headless episodes and one complete live-server
+episode completed all 12 putaway tasks with zero collisions and zero positions or published paths
+inside declared solid footprints. The previous Phase 5 baseline remains documented separately.

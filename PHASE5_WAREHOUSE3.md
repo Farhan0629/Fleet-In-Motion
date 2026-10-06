@@ -103,3 +103,36 @@ unchanged.
 Shared in-world signage now widens for long titles and fits both title and subtitle fonts to the
 available texture width. Labels such as **ASRS · AUTOMATED STORAGE**, **OUTBOUND / DISPATCH
 DOCKS**, and **RETURNS & REVERSE LOGISTICS** therefore remain complete instead of being clipped.
+
+## Physical-clearance correction
+
+A later full-scene audit found that several decorative WH3 objects were positioned on cells that
+the navigation grid still considered driveable. The robot planner was obeying its map, but the map
+and rendered solids disagreed.
+
+The corrected WH3 definition now declares blocked physical footprints for the sortation conveyor,
+ASRS core, control room, workbenches, pallet stacks, maintenance station, dispatch buffer, and
+returns station. Auxiliary rendering is derived from those same footprints. The unsupported ASRS
+elevated side conveyors were replaced by ground-supported transfer decks inside the blocked ASRS
+core, north-dock ramps were removed from station cells, and decorative rack-corner bollards were
+removed from aisles.
+
+The original Phase 5 baseline above remains recorded. After the clearance correction, the measured
+topology and deterministic result are:
+
+| Metric | Corrected WH3 |
+| --- | ---: |
+| Walkable cells | 583 |
+| Shelf cells | 60 |
+| Wall/solid cells | 221 |
+| Connected components | 1 |
+| Aisle graph diameter | 54 cells |
+| Putaway completion | 12/12 |
+| Headless completion tick | 300 |
+| Same-cell collisions | 0 |
+| Swap collisions | 0 |
+| Entries into declared solid footprints | 0 |
+| Live server completion tick | 322 |
+
+The live server run inspected 323 state frames, including every robot position and every published
+planned-path cell. It completed with zero solid-footprint violations and zero collisions.

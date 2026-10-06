@@ -147,6 +147,41 @@ class EnvironmentEngineTests(unittest.TestCase):
         self.assertFalse(report.is_valid)
         self.assertTrue(any("solid navigation footprint overlaps" in error for error in report.errors))
 
+    def test_multi_part_solid_footprint_cannot_overlap_an_aisle(self):
+        definition = WarehouseDefinition(
+            id="multi_footprint_overlap",
+            name="Multi footprint overlap test",
+            dimensions=WarehouseDimensions(width=6, height=6),
+            layout=[
+                "WWWWWW",
+                "WC...W",
+                "W....W",
+                "W....W",
+                "W...PW",
+                "WWWWWW",
+            ],
+            operational_settings=OperationalSettings(
+                default_num_robots=1,
+                robot_starts=[(2, 2)],
+            ),
+            zones=[{
+                "id": "u_conveyor",
+                "name": "U conveyor",
+                "category": "sortation",
+                "bounds": (1, 1, 4, 4),
+                "metadata": {
+                    "navigation_footprints": [
+                        [1, 1, 1, 4],
+                        [4, 1, 4, 4],
+                        [2, 4, 3, 4],
+                    ]
+                },
+            }],
+        )
+        _, report = EnvironmentEngine.compile_definition(definition)
+        self.assertFalse(report.is_valid)
+        self.assertTrue(any("solid navigation footprint overlaps" in error for error in report.errors))
+
 
 if __name__ == "__main__":
     unittest.main()

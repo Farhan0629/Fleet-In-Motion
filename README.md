@@ -390,6 +390,10 @@ Select **WH #3 · ASRS Campus 36×24** under **Facility Topology** in the dashbo
 Phase 5 topology and deterministic simulation baseline are preserved in
 [`PHASE5_WAREHOUSE3.md`](PHASE5_WAREHOUSE3.md).
 
+WH3 also enforces a compiler-validated physical-clearance contract: every custom solid machine or
+fixture is blocked in the navigation grid, including multipart conveyor footprints. The validation
+report records the original baseline and the later full-scene clearance correction separately.
+
 ## Phase 6: Dynamic semantic tasks
 
 The existing fleet auction now accepts runtime missions expressed as warehouse station or zone
