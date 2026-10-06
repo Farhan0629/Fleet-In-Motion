@@ -55,6 +55,7 @@ class Task:
             "dropoff_kind": self.dropoff_kind,
             "table_code": self.table_code,
             "slot_code": self.slot_code,
+            "slot_id": self.slot_id,
             "slot_cell": list(self.slot_cell) if self.slot_cell else None,
             "origin": list(self.origin),
             "destination": list(self.destination),
@@ -66,8 +67,15 @@ class TaskManager:
     Decentralized task allocation using a simplified bid auction.
     """
 
-    def __init__(self, warehouse):
+    def __init__(self, warehouse, target_islands: list[int] | None = None):
         self.warehouse = warehouse
+        # Allow per-warehouse target islands or explicit override; fallback to config.TARGET_ISLANDS
+        if target_islands is not None:
+            self.target_islands = target_islands
+        elif getattr(warehouse, "target_islands", None) is not None:
+            self.target_islands = warehouse.target_islands
+        else:
+            self.target_islands = TARGET_ISLANDS
         # Package labels restart at #1 for every demonstration run.
         Task._counter = 0
         self.pending_tasks: list[Task] = []
@@ -79,7 +87,7 @@ class TaskManager:
     def _choose_slot(self, index: int, pickup: tuple[int, int]) -> dict | None:
         """Reserve an empty rack slot for the carton staged at `pickup`.
 
-        When TARGET_ISLANDS is set, the target islands are tried in order so
+        When target_islands is set and valid, the target islands are tried in order so
         that all slots in the first island fill before the second is touched.
         """
         islands = getattr(self.warehouse, "rack_islands", [])
@@ -87,12 +95,12 @@ class TaskManager:
         if not islands or not slots:
             return None
 
-        if TARGET_ISLANDS is not None:
+        valid_targets = [idx for idx in (self.target_islands or []) if idx < len(islands)] if self.target_islands is not None else None
+
+        if valid_targets:
             # Sequential filling: walk through target islands in order and
             # pick the first one that still has an empty slot.
-            for island_idx in TARGET_ISLANDS:
-                if island_idx >= len(islands):
-                    continue
+            for island_idx in valid_targets:
                 island = islands[island_idx]
                 candidates = [
                     slots[sid] for sid in island["slots"]
@@ -110,7 +118,8 @@ class TaskManager:
             return None  # all target islands full
 
         # Original spread-across-islands logic
-        island = islands[ISLAND_ORDER[index % len(ISLAND_ORDER)] % len(islands)]
+        island_idx = ISLAND_ORDER[index % len(ISLAND_ORDER)] % len(islands) if len(islands) > 0 else 0
+        island = islands[island_idx]
         candidates = [slots[slot_id] for slot_id in island["slots"] if slots[slot_id]["state"] == "empty"]
         if not candidates:
             candidates = [slot for slot in slots if slot["state"] == "empty"]
@@ -161,8 +170,9 @@ class TaskManager:
         self.warehouse.reset_tables()
         self.warehouse.reset_racks()
         # Pre-fill every island that is NOT a target so it appears occupied.
-        if TARGET_ISLANDS is not None:
-            target_set = set(TARGET_ISLANDS)
+        valid_targets = [idx for idx in (self.target_islands or []) if idx < len(self.warehouse.rack_islands)] if self.target_islands is not None else None
+        if valid_targets:
+            target_set = set(valid_targets)
             for idx, island in enumerate(self.warehouse.rack_islands):
                 if idx not in target_set:
                     for sid in island["slots"]:
@@ -215,6 +225,13 @@ class TaskManager:
         for task in self.active_tasks[:]:
             assigned_robot = next((r for r in robots if r.id == task.assigned_to), None)
             if assigned_robot:
+                # Robot-selected access may change; shelf destination and slot
+                # reservation do not. Keep task telemetry consistent with its unit.
+                payload = assigned_robot.current_task
+                if (payload and payload.get("id") == task.id and task.dropoff_kind == "rack"
+                        and tuple(payload["dropoff"]) in self.warehouse.rack_access_cells(task.slot_cell)):
+                    task.dropoff = tuple(payload["dropoff"])
+                    task.slot_access = task.dropoff
                 charging = (
                     assigned_robot.status in ("charging", "moving_to_charge")
                     or getattr(assigned_robot, "target_charger", None) is not None

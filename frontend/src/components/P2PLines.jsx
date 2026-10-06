@@ -50,15 +50,21 @@ export default function P2PLines() {
   return (
     <group>
       {connections.map((conn, i) => {
-        const points = [
-          new THREE.Vector3(...conn.from),
-          new THREE.Vector3(...conn.to),
-        ]
-        const geo = new THREE.BufferGeometry().setFromPoints(points)
+        const p1 = new THREE.Vector3(...conn.from)
+        const p2 = new THREE.Vector3(...conn.to)
+        const geo = new THREE.BufferGeometry().setFromPoints([p1, p2])
+        const mid = p1.clone().lerp(p2, 0.5)
         return (
-          <line key={i} geometry={geo}>
-            <lineBasicMaterial color="#4b74b0" transparent opacity={0.42} linewidth={1} />
-          </line>
+          <group key={i}>
+            <line geometry={geo}>
+              <lineBasicMaterial color="#38bdf8" transparent opacity={0.8} linewidth={2} />
+            </line>
+            {/* Glowing mesh signal packet visible from robot eye perspective */}
+            <mesh position={[mid.x, mid.y, mid.z]}>
+              <sphereGeometry args={[0.075, 10, 8]} />
+              <meshBasicMaterial color="#7dd3fc" transparent opacity={0.9} />
+            </mesh>
+          </group>
         )
       })}
     </group>

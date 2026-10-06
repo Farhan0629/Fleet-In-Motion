@@ -1,0 +1,283 @@
+{
+  "$defs": {
+    "ChargerDefinition": {
+      "description": "Inductive charging pad station.",
+      "properties": {
+        "id": {
+          "minimum": 0,
+          "title": "Id",
+          "type": "integer"
+        },
+        "code": {
+          "maxLength": 16,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "cell": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Cell",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "cell"
+      ],
+      "title": "ChargerDefinition",
+      "type": "object"
+    },
+    "OperationalSettings": {
+      "description": "Simulation and operational parameters associated with the facility.",
+      "properties": {
+        "target_islands": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Indices of rack islands targeted for sequential putaway. None to spread across all.",
+          "title": "Target Islands"
+        },
+        "default_num_robots": {
+          "default": 3,
+          "description": "Default fleet size for this floor.",
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Default Num Robots",
+          "type": "integer"
+        },
+        "robot_starts": {
+          "description": "Recommended initial spawn coordinates for AMR units.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Robot Starts",
+          "type": "array"
+        }
+      },
+      "title": "OperationalSettings",
+      "type": "object"
+    },
+    "StationDefinition": {
+      "description": "Explicit semantic staging table / pickup / dropoff station.",
+      "properties": {
+        "id": {
+          "minimum": 0,
+          "title": "Id",
+          "type": "integer"
+        },
+        "code": {
+          "maxLength": 16,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "cell": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Cell",
+          "type": "array"
+        },
+        "side": {
+          "default": "west",
+          "enum": [
+            "west",
+            "east",
+            "north",
+            "south",
+            "central"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "station_type": {
+          "default": "table",
+          "enum": [
+            "table",
+            "pickup",
+            "dropoff"
+          ],
+          "title": "Station Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "cell"
+      ],
+      "title": "StationDefinition",
+      "type": "object"
+    },
+    "WarehouseDimensions": {
+      "description": "Spatial dimensions and resolution of the warehouse grid.",
+      "properties": {
+        "width": {
+          "description": "Number of grid columns (X-axis).",
+          "maximum": 500,
+          "minimum": 4,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "description": "Number of grid rows (Y-axis / Z-axis in 3D).",
+          "maximum": 500,
+          "minimum": 4,
+          "title": "Height",
+          "type": "integer"
+        },
+        "cell_size": {
+          "default": 1.0,
+          "description": "Physical size of one cell in meters.",
+          "exclusiveMinimum": 0.0,
+          "maximum": 10.0,
+          "title": "Cell Size",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "WarehouseDimensions",
+      "type": "object"
+    },
+    "WarehouseMetadata": {
+      "description": "Metadata describing facility provenance and modeling context.",
+      "properties": {
+        "author": {
+          "default": "SIH 26123 Team",
+          "description": "Author or engineering team.",
+          "title": "Author",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "",
+          "description": "ISO-8601 date string.",
+          "title": "Created At",
+          "type": "string"
+        },
+        "facility_type": {
+          "default": "distribution_center",
+          "description": "Warehouse topology classification.",
+          "title": "Facility Type",
+          "type": "string"
+        },
+        "unit": {
+          "default": "meter",
+          "description": "Measurement unit for dimensions.",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "title": "WarehouseMetadata",
+      "type": "object"
+    }
+  },
+  "description": "Complete standard warehouse environment specification.",
+  "properties": {
+    "id": {
+      "description": "Unique warehouse slug.",
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[a-z0-9_-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "description": "Human-readable facility name.",
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "description": "Semantic version of this warehouse layout.",
+      "title": "Version",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "description": "Detailed summary of topology and aisle layout.",
+      "title": "Description",
+      "type": "string"
+    },
+    "dimensions": {
+      "$ref": "#/$defs/WarehouseDimensions"
+    },
+    "layout": {
+      "description": "ASCII grid matrix defining physical structure.",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 4,
+      "title": "Layout",
+      "type": "array"
+    },
+    "metadata": {
+      "$ref": "#/$defs/WarehouseMetadata"
+    },
+    "operational_settings": {
+      "$ref": "#/$defs/OperationalSettings"
+    },
+    "stations": {
+      "items": {
+        "$ref": "#/$defs/StationDefinition"
+      },
+      "title": "Stations",
+      "type": "array"
+    },
+    "chargers": {
+      "items": {
+        "$ref": "#/$defs/ChargerDefinition"
+      },
+      "title": "Chargers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "dimensions",
+    "layout"
+  ],
+  "title": "WarehouseDefinition",
+  "type": "object"
+}

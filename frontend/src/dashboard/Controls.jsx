@@ -38,6 +38,28 @@ export default function Controls() {
 
   return (
     <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Facility Topology</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={!connected || (sim.running && !sim.paused)}
+            onClick={() => sendSafe('switch_warehouse', { warehouse_id: 'warehouse_1' })}
+            className={`${BUTTON} text-xs ${(warehouse?.id === 'warehouse_1' || (!warehouse?.id && warehouse?.width === 20)) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
+          >
+            WH #1: Standard 20×20
+          </button>
+          <button
+            type="button"
+            disabled={!connected || (sim.running && !sim.paused)}
+            onClick={() => sendSafe('switch_warehouse', { warehouse_id: 'warehouse_2' })}
+            className={`${BUTTON} text-xs ${(warehouse?.id === 'warehouse_2' || warehouse?.width === 28) ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
+          >
+            WH #2: Smart Hub 28×16
+          </button>
+        </div>
+      </div>
+
       <h2 className="text-sm font-semibold text-slate-900">Demonstration controls</h2>
 
       <div className="grid grid-cols-2 gap-2">
@@ -164,15 +186,14 @@ export default function Controls() {
             ['overview', 'Overview'],
             ['topdown', 'Top-down'],
             ['follow', 'Follow selected'],
-            ['receiving', 'Receiving'],
-            ['dispatch', 'Dispatch'],
+            ['pov', "Robot's POV"],
             ['orbit', 'Manual orbit'],
           ].map(([mode, label]) => (
             <button
               key={mode}
               type="button"
               onClick={() => setCameraMode(mode)}
-              className={`${BUTTON} ${cameraMode === mode ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
+              className={`${BUTTON} ${mode === 'orbit' ? 'col-span-2' : ''} ${cameraMode === mode ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 bg-slate-50 text-slate-800'}`}
             >
               {label}
             </button>

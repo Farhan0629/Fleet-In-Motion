@@ -108,6 +108,8 @@ export default function Robot({ robot, selected = false, onSelect }) {
   const routes = useStore((s) => s.showRoutes)
   const network = useStore((s) => s.network)
   const shelfView = useStore((s) => s.shelfView)
+  const cameraMode = useStore((s) => s.cameraMode)
+  const isPovSelf = selected && cameraMode === 'pov'
   const color = ACCENTS[(robot.id - 1) % ACCENTS.length]
   const handling = robot.handling
   const hasPackage = Boolean(robot.has_cargo || handling)
@@ -168,10 +170,15 @@ export default function Robot({ robot, selected = false, onSelect }) {
         <mesh position={[0, 1.08, 0.15]}><boxGeometry args={[0.18, 0.035, 0.012]} /><meshBasicMaterial color={offline ? '#e0546a' : charging || parked ? '#6ee7a8' : handling ? '#f2b544' : '#9ed8d3'} /></mesh>
         <Shell at={[0, 1.18, -0.15]} size={[0.16, 0.18, 0.072]} color={JOINT} />
         <BatteryPack level={battery} charging={charging} />
-        <Joint at={[0, 1.43, 0]} radius={0.065} />
-        <Shell at={[0, RIG.head, 0]} size={[0.165, 0.17, 0.145]} />
-        <Shell at={[0, RIG.head + 0.005, 0.113]} size={[0.137, 0.078, 0.06]} color="#101e30" />
-        {[-1, 1].map((s) => <mesh key={s} position={[s * 0.064, RIG.head + 0.014, 0.173]}><boxGeometry args={[0.048, 0.016, 0.01]} /><meshBasicMaterial color="#8bd4f7" /></mesh>)}
+        {/* Hide head components when camera is inside this robot's eyes to prevent near-clipping */}
+        {!isPovSelf && (
+          <>
+            <Joint at={[0, 1.43, 0]} radius={0.065} />
+            <Shell at={[0, RIG.head, 0]} size={[0.165, 0.17, 0.145]} />
+            <Shell at={[0, RIG.head + 0.005, 0.113]} size={[0.137, 0.078, 0.06]} color="#101e30" />
+            {[-1, 1].map((s) => <mesh key={s} position={[s * 0.064, RIG.head + 0.014, 0.173]}><boxGeometry args={[0.048, 0.016, 0.01]} /><meshBasicMaterial color="#8bd4f7" /></mesh>)}
+          </>
+        )}
         <Arm side={-1} upper={leftArm} elbow={leftElbow} color={color} />
         <Arm side={1} upper={rightArm} elbow={rightElbow} color={color} />
         <Leg side={-1} hip={leftHip} knee={leftKnee} />
@@ -179,13 +186,14 @@ export default function Robot({ robot, selected = false, onSelect }) {
         {hasPackage && <group ref={cargo} position={transferPose(handling, station).position}><CargoBox taskId={taskId} scale={1} /></group>}
       </group>
       {/* The only screen-space label left in the scene: the unit's name, kept
-          small. Live status moved to the dashboard inspector, and every other
-          floor label is now a 3D sign. */}
-      <Html position={[0, 1.82, 0]} center zIndexRange={[12, 0]} style={{ pointerEvents: 'none' }}>
-        <button onClick={() => onSelect?.(robot.id)} aria-label={`Inspect ${name}${offline ? ', radio offline' : ''}${charging ? `, charging at ${Math.round(battery)} percent` : ''}${parked ? ', parked and charged' : ''}`} style={{ pointerEvents: 'auto', whiteSpace: 'nowrap', padding: '2px 8px', fontSize: 11, lineHeight: '16px', fontWeight: 600, letterSpacing: '0.02em', borderRadius: 999, border: `1px solid ${offline ? '#e0546a' : charging || parked ? '#297359' : color}`, background: selected ? color : '#ffffffee', color: selected ? '#ffffff' : '#243141', boxShadow: '0 1px 4px #15243826' }}>
-          {name}{offline ? ' ✕' : ''}{charging || parked ? ` ⚡${Math.round(battery)}%` : ''}
-        </button>
-      </Html>
+          small. Hidden in first-person POV so it does not obstruct the eye view. */}
+      {!isPovSelf && (
+        <Html position={[0, 1.82, 0]} center zIndexRange={[12, 0]} style={{ pointerEvents: 'none' }}>
+          <button onClick={() => onSelect?.(robot.id)} aria-label={`Inspect ${name}${offline ? ', radio offline' : ''}${charging ? `, charging at ${Math.round(battery)} percent` : ''}${parked ? ', parked and charged' : ''}`} style={{ pointerEvents: 'auto', whiteSpace: 'nowrap', padding: '2px 8px', fontSize: 11, lineHeight: '16px', fontWeight: 600, letterSpacing: '0.02em', borderRadius: 999, border: `1px solid ${offline ? '#e0546a' : charging || parked ? '#297359' : color}`, background: selected ? color : '#ffffffee', color: selected ? '#ffffff' : '#243141', boxShadow: '0 1px 4px #15243826' }}>
+            {name}{offline ? ' ✕' : ''}{charging || parked ? ` ⚡${Math.round(battery)}%` : ''}
+          </button>
+        </Html>
+      )}
     </group>
     <ChargeCable charger={robot.charger} x={robot.x} y={robot.y} heading={robot.heading} active={charging || parked} />
     {routes && robot.planned_path?.length > 0 && <PathTrail path={robot.planned_path} color={color} />}

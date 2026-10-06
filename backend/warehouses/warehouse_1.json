@@ -1,0 +1,245 @@
+{
+  "id": "warehouse_1",
+  "name": "Standard Demonstration Warehouse",
+  "version": "1.0.0",
+  "description": "20x20 grid with 12 staging tables (6 West, 6 East), 9 rack islands, 4 corner chargers, and central aisles.",
+  "dimensions": {
+    "width": 20,
+    "height": 20,
+    "cell_size": 1.0
+  },
+  "layout": [
+    "WWWWWWWWWWWWWWWWWWWW",
+    "WC................CW",
+    "W.P.............D..W",
+    "W....##..##..##....W",
+    "W....##..##..##....W",
+    "W.P.............D..W",
+    "W..................W",
+    "W..................W",
+    "W.P.............D..W",
+    "W....##..##..##....W",
+    "W....##..##..##....W",
+    "W.P.............D..W",
+    "W..................W",
+    "W..................W",
+    "W.P.............D..W",
+    "W....##..##..##....W",
+    "W....##..##..##....W",
+    "W.P.............D..W",
+    "WC................CW",
+    "WWWWWWWWWWWWWWWWWWWW"
+  ],
+  "metadata": {
+    "author": "SIH 26123 Team",
+    "created_at": "2026-10-05",
+    "facility_type": "distribution_center",
+    "unit": "meter"
+  },
+  "operational_settings": {
+    "target_islands": [
+      0,
+      4,
+      8
+    ],
+    "default_num_robots": 3,
+    "robot_starts": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        1,
+        18
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        7,
+        1
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        13,
+        1
+      ],
+      [
+        16,
+        1
+      ],
+      [
+        4,
+        18
+      ],
+      [
+        7,
+        18
+      ]
+    ]
+  },
+  "stations": [
+    {
+      "id": 0,
+      "code": "T01",
+      "cell": [
+        2,
+        2
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 1,
+      "code": "T02",
+      "cell": [
+        2,
+        5
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 2,
+      "code": "T03",
+      "cell": [
+        2,
+        8
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 3,
+      "code": "T04",
+      "cell": [
+        2,
+        11
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 4,
+      "code": "T05",
+      "cell": [
+        2,
+        14
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 5,
+      "code": "T06",
+      "cell": [
+        2,
+        17
+      ],
+      "side": "west",
+      "station_type": "table"
+    },
+    {
+      "id": 6,
+      "code": "T07",
+      "cell": [
+        16,
+        2
+      ],
+      "side": "east",
+      "station_type": "table"
+    },
+    {
+      "id": 7,
+      "code": "T08",
+      "cell": [
+        16,
+        5
+      ],
+      "side": "east",
+      "station_type": "table"
+    },
+    {
+      "id": 8,
+      "code": "T09",
+      "cell": [
+        16,
+        8
+      ],
+      "side": "east",
+      "station_type": "table"
+    },
+    {
+      "id": 9,
+      "code": "T10",
+      "cell": [
+        16,
+        11
+      ],
+      "side": "east",
+      "station_type": "table"
+    },
+    {
+      "id": 10,
+      "code": "T11",
+      "cell": [
+        16,
+        14
+      ],
+      "side": "east",
+      "station_type": "table"
+    },
+    {
+      "id": 11,
+      "code": "T12",
+      "cell": [
+        16,
+        17
+      ],
+      "side": "east",
+      "station_type": "table"
+    }
+  ],
+  "chargers": [
+    {
+      "id": 0,
+      "code": "CHARGE 1",
+      "cell": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": 1,
+      "code": "CHARGE 2",
+      "cell": [
+        18,
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "code": "CHARGE 3",
+      "cell": [
+        1,
+        18
+      ]
+    },
+    {
+      "id": 3,
+      "code": "CHARGE 4",
+      "cell": [
+        18,
+        18
+      ]
+    }
+  ]
+}

@@ -49,6 +49,7 @@ export default function Dashboard() {
   const selectedRobot = robots.find((robot) => robot.id === selectedRobotId)
   const mission = getMissionSummary(tasks)
   const partitioned = network?.partitioned ?? []
+  const barrierBlocked = robots.filter((robot) => robot.navigation_blocked_reason === 'barrier')
 
   return (
     <div className="space-y-3 p-3 md:p-4">
@@ -70,6 +71,13 @@ export default function Dashboard() {
           <div className="rounded border border-slate-200 bg-slate-50 p-2 text-slate-700">In racks <span className="block text-sm font-semibold text-slate-900">{mission.inRacks}</span></div>
         </div>
       </section>
+
+      {barrierBlocked.length > 0 && (
+        <section role="alert" className="sticky top-0 z-10 rounded-lg border border-rose-300 bg-rose-50 p-3 text-rose-800 shadow-sm">
+          <h2 className="text-sm font-semibold">Please remove the barrier</h2>
+          <p className="mt-1 text-xs">Barrier blockage for {barrierBlocked.map((robot) => robot.name || `Unit ${robot.id}`).join(', ')}. No usable exit or destination route. Pause and open a gap, then resume.</p>
+        </section>
+      )}
 
       <Controls />
       <SelectedInspector robot={selectedRobot} offline={selectedRobot ? partitioned.includes(selectedRobot.id) : false} />

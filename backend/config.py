@@ -1,6 +1,8 @@
-# ─── Warehouse Grid ───
-GRID_WIDTH = 20          # columns
-GRID_HEIGHT = 20         # rows
+# ─── Default Warehouse Grid (Default Layout) ───
+# Note: In the decoupled architecture, Warehouse instances derive their width
+# and height dynamically from their layout definition.
+GRID_WIDTH = 20          # default columns
+GRID_HEIGHT = 20         # default rows
 CELL_SIZE = 1.0          # 1 unit = 1 meter in 3D
 
 # ─── Cell Types ───

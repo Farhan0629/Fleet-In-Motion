@@ -5,6 +5,15 @@ import useStore from '../store'
 import CargoBox from './CargoBox'
 import BlockedAisle from './BlockedAisle'
 import Sign from './Signage'
+import {
+  FreightTruck,
+  DockDoor,
+  SortationLoop,
+  RestrictedZone,
+  AuxiliaryZone,
+  QuadrantSignAndBollards,
+  RoadwayMarkings,
+} from './SmartWarehouseElements'
 import { sendCommand } from '../websocket'
 import { mapCargoLifecycle } from '../utils/simulationState.js'
 function Batch({ items, color, opacity = 1 }) {
@@ -26,8 +35,8 @@ function Batch({ items, color, opacity = 1 }) {
 // carton can never appear on a table it has already left.
 function Station({ table, staged, handling }) {
   const [x, z] = table.cell
-  const west = table.side === 'west'
-  const tone = west ? '#a56b1e' : '#2f6a8f'
+  const side = table.side || 'west'
+  const tone = side === 'north' ? '#1d4ed8' : side === 'south' ? '#1e3a8a' : side === 'west' ? '#a56b1e' : '#2f6a8f'
   const busy = handling.some((h) => h.place !== 'rack' && h.station[0] === x && h.station[1] === z)
   const item = staged || null
   const state = busy
@@ -190,6 +199,8 @@ export default function Warehouse() {
   const cargo = useMemo(() => mapCargoLifecycle(tasks, robots, warehouse), [tasks, robots, warehouse])
   if (!warehouse) return null
   const { width, height } = warehouse
+  const gridDimension = Math.max(width, height)
+  const bayPositions = useMemo(() => Array.from(new Set((warehouse.rack_islands || []).map((i) => i.cell[0] + 1))).sort((a, b) => a - b), [warehouse])
   const opacity = shelfView === 'xray' ? 0.18 : 1
   const handling = robots.map((r) => r.handling).filter(Boolean)
   const placing = placeMode && (!sim.running || sim.paused)
@@ -197,18 +208,97 @@ export default function Warehouse() {
   // keeps the pad label and the cable.
   const padOccupant = (x, z) => robots.find((r) => r.charger?.[0] === x && r.charger?.[1] === z && (r.status === 'charging' || r.parked))?.name
   const padClaimant = (x, z) => robots.find((r) => r.charger?.[0] === x && r.charger?.[1] === z && r.status === 'moving_to_charge')?.name
+  const zones = warehouse.zones || []
+  const exteriorAssets = warehouse.exterior_assets || []
+  const markings = warehouse.markings || []
+  const hasZones = zones.length > 0
+
   return <group>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.005, height / 2]} receiveShadow><planeGeometry args={[width + 0.8, height + 0.8]} /><meshStandardMaterial color="#d5dbd8" roughness={0.86} /></mesh>
-    <gridHelper args={[20, 20, '#aebbb9', '#c0cbc7']} position={[width / 2, 0.002, height / 2]} />
-    <Batch items={batches.walls} color="#ced6dc" /><Batch items={batches.posts} color="#355b83" opacity={opacity} /><Batch items={batches.rails} color="#ce8c36" opacity={opacity} /><Batch items={batches.decks} color="#8393a1" opacity={opacity} /><Batch items={batches.boxes} color="#bc956e" opacity={opacity} /><Batch items={batches.tape} color="#e0c7a5" opacity={opacity} /><Batch items={batches.lanes} color="#c69234" />
-    {[5, 11, 17].map((x) => <group key={x} position={[x, 0, 0.98]}>
+    {/* Interior clean light-gray concrete warehouse floor */}
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.005, height / 2]} receiveShadow>
+      <planeGeometry args={[width + 1.2, height + 1.2]} />
+      <meshStandardMaterial color="#e2e8f0" roughness={0.65} metalness={0.08} />
+    </mesh>
+    {/* Exterior logistics asphalt apron outside south dock doors for freight trucks */}
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.007, height + 1.8]} receiveShadow>
+      <planeGeometry args={[width + 3.0, 3.8]} />
+      <meshStandardMaterial color="#64748b" roughness={0.88} />
+    </mesh>
+    {/* Subtle expansion joints on concrete floor */}
+    <gridHelper args={[gridDimension, gridDimension, '#cbd5e1', '#e2e8f0']} position={[width / 2, 0.001, height / 2]} />
+    {/* Clean off-white / light industrial wall panels */}
+    <Batch items={batches.walls} color="#cbd5e1" />
+    {/* High-detail pallet racks: royal industrial blue uprights, safety orange crossbeams */}
+    <Batch items={batches.posts} color="#1d4ed8" opacity={opacity} />
+    <Batch items={batches.rails} color="#ea580c" opacity={opacity} />
+    <Batch items={batches.decks} color="#94a3b8" opacity={opacity} />
+    <Batch items={batches.boxes} color="#d4a373" opacity={opacity} />
+    <Batch items={batches.tape} color="#b45309" opacity={opacity} />
+    <Batch items={batches.lanes} color="#facc15" />
+    {!hasZones && bayPositions.map((x, idx) => <group key={x} position={[x, 0, 0.98]}>
       <mesh position={[0, 1.27, 0.04]}><boxGeometry args={[2.5, 2.38, 0.045]} /><meshStandardMaterial color="#8696a5" roughness={0.65} /></mesh>
       {Array.from({ length: 9 }, (_, i) => <mesh key={i} position={[0, 0.2 + i * 0.26, 0.075]}><boxGeometry args={[2.43, 0.02, 0.02]} /><meshStandardMaterial color="#627486" /></mesh>)}
-      <Sign at={[0, 1.95, 0.11]} title={`BAY ${Math.round((x + 1) / 6)}`} width={2.1} billboard={false} />
+      <Sign at={[0, 1.95, 0.11]} title={`BAY ${idx + 1}`} width={2.1} billboard={false} />
     </group>)}
-    {/* Aisle-side address plate for every rack island, so PUTAWAY A1-01 on the
-        dashboard points at somewhere a judge can actually find on the floor. */}
-    {(warehouse.rack_islands || []).map((island) => <Sign key={island.code} at={[island.cell[0] + 1, low ? 1.12 : 2.52, island.cell[1] + 1]} title={`RACK ${island.code}`} tone="#4a5a8f" width={1.15} />)}
+    {/* Generic 3D Semantic Zones */}
+    {zones.map((zone) => {
+      if (zone.category === 'storage') {
+        return <QuadrantSignAndBollards key={zone.id} zone={zone} />
+      }
+      if (zone.category === 'sortation') {
+        return <SortationLoop key={zone.id} zone={zone} />
+      }
+      if (zone.category === 'restricted') {
+        return <RestrictedZone key={zone.id} zone={zone} />
+      }
+      if (zone.category === 'charging') {
+        const cx = (zone.bounds[0] + zone.bounds[2]) / 2 + 0.5
+        const cz = (zone.bounds[1] + zone.bounds[3]) / 2 + 0.5
+        return (
+          <Sign
+            key={zone.id}
+            at={[cx, 2.7, cz]}
+            title={zone.name}
+            subtitle="Inductive AMR Power Depot"
+            tone={zone.color}
+            width={2.8}
+            hang={0.7}
+          />
+        )
+      }
+      if (zone.category === 'auxiliary') {
+        return <AuxiliaryZone key={zone.id} zone={zone} />
+      }
+      if (zone.category === 'staging') {
+        const cx = (zone.bounds[0] + zone.bounds[2]) / 2 + 0.5
+        const cz = (zone.bounds[1] + zone.bounds[3]) / 2 + 0.5
+        return (
+          <Sign
+            key={zone.id}
+            at={[cx, 3.4, cz]}
+            title={zone.name}
+            tone={zone.color}
+            width={3.2}
+            hang={0.7}
+          />
+        )
+      }
+      return null
+    })}
+    {/* Generic 3D Exterior Assets (Trucks & Dock Doors) */}
+    {exteriorAssets.map((asset, i) => {
+      if (asset.type === 'freight_truck') {
+        return <FreightTruck key={`truck-${i}`} position={asset.position} color={asset.color} />
+      }
+      if (asset.type === 'dock_door') {
+        return <DockDoor key={`door-${i}`} position={asset.position} orientation={asset.orientation} />
+      }
+      return null
+    })}
+    {/* Generic Roadway Markings */}
+    {markings.length > 0 && <RoadwayMarkings markings={markings} />}
+    {/* Aisle-side address plate for every rack island in standard warehouse without macro-quadrants */}
+    {!hasZones && (warehouse.rack_islands || []).map((island) => <Sign key={island.code} at={[island.cell[0] + 1, low ? 1.12 : 2.52, island.cell[1] + 1]} title={`RACK ${island.code}`} tone="#4a5a8f" width={1.15} />)}
     {/* Live inventory: the reserved slot glows amber at its access cell, the
         stored slot turns green and carries the real package until it is picked. */}
     {liveSlots.map((slot) => <group key={slot.id}>

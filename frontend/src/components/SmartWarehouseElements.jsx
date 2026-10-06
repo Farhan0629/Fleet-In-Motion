@@ -1,0 +1,413 @@
+import { useMemo } from 'react'
+import * as THREE from 'three'
+import Sign from './Signage'
+
+/**
+ * 3D Freight delivery trucks parked at outbound dock bays.
+ * Scaled and low-profile to support the scene realistically without dominating the foreground.
+ */
+export function FreightTruck({ position = [0, 0], color = '#ffffff' }) {
+  const [x, z] = position
+  return (
+    <group position={[x + 0.5, 0, z + 1.8]}>
+      {/* Container Trailer Box (docked outside) */}
+      <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.35, 1.55, 2.75]} />
+        <meshStandardMaterial color={color} roughness={0.5} metalness={0.15} />
+      </mesh>
+      {/* Trailer Roof Cap */}
+      <mesh position={[0, 1.95, 0]}>
+        <boxGeometry args={[1.38, 0.06, 2.78]} />
+        <meshStandardMaterial color="#64748b" roughness={0.6} />
+      </mesh>
+      {/* Truck Cab */}
+      <mesh position={[0, 0.95, 1.8]} castShadow>
+        <boxGeometry args={[1.3, 1.35, 0.95]} />
+        <meshStandardMaterial color={color === '#ffffff' ? '#334155' : color} roughness={0.35} metalness={0.3} />
+      </mesh>
+      {/* Windshield */}
+      <mesh position={[0, 1.25, 2.3]}>
+        <boxGeometry args={[1.15, 0.45, 0.04]} />
+        <meshStandardMaterial color="#38bdf8" roughness={0.1} metalness={0.8} />
+      </mesh>
+      {/* Wheels */}
+      {[-0.7, 0.7].map((wx) =>
+        [-0.85, 0.25, 1.75].map((wz, wi) => (
+          <mesh key={`${wx}-${wi}`} position={[wx, 0.28, wz]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.28, 0.28, 0.16, 16]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.8} />
+          </mesh>
+        ))
+      )}
+      {/* Rear Bumper & Hazard Reflector */}
+      <mesh position={[0, 0.35, -1.4]}>
+        <boxGeometry args={[1.25, 0.08, 0.06]} />
+        <meshStandardMaterial color="#eab308" />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * Industrial Roll-up Dock Door Frames with overhead gooseneck safety lamp.
+ */
+export function DockDoor({ position = [0, 0], orientation = 'south' }) {
+  const [x, z] = position
+  const isSouth = orientation === 'south'
+  const isNorth = orientation === 'north'
+  const offsetZ = isSouth ? 0.48 : -0.48
+  return (
+    <group position={[x + 0.5, 0, z + 0.5 + offsetZ]}>
+      {/* Door Frame Surround */}
+      <mesh position={[0, 1.45, 0]}>
+        <boxGeometry args={[1.85, 2.7, 0.14]} />
+        <meshStandardMaterial color="#64748b" roughness={0.6} metalness={0.3} />
+      </mesh>
+      {/* Ribbed Roll-Up Shutter Panels */}
+      <mesh position={[0, 1.4, isSouth ? 0.03 : -0.03]}>
+        <boxGeometry args={[1.6, 2.5, 0.05]} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.7} metalness={0.2} />
+      </mesh>
+      {/* Overhead Industrial Safety Lamp */}
+      <mesh position={[0, 2.9, isSouth ? 0.18 : -0.18]}>
+        <boxGeometry args={[0.22, 0.08, 0.24]} />
+        <meshStandardMaterial color="#334155" />
+      </mesh>
+      <mesh position={[0, 2.84, isSouth ? 0.2 : -0.2]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshBasicMaterial color="#fef08a" />
+      </mesh>
+      {/* Yellow Safety Bollards flanking each dock door */}
+      {[-0.95, 0.95].map((bx) => (
+        <mesh key={`db-${bx}`} position={[bx, 0.38, isSouth ? -0.2 : 0.2]}>
+          <cylinderGeometry args={[0.06, 0.06, 0.76, 12]} />
+          <meshStandardMaterial color="#eab308" roughness={0.3} />
+        </mesh>
+      ))}
+      {/* North Receiving Intake Conveyor Ramp */}
+      {isNorth && (
+        <group position={[0, 0.45, 1.0]}>
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry args={[0.95, 0.08, 1.4]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} />
+          </mesh>
+          {/* Support legs */}
+          {[-0.42, 0.42].map((lx) => (
+            <mesh key={`rl-${lx}`} position={[lx, -0.22, 0.5]}>
+              <boxGeometry args={[0.04, 0.44, 0.04]} />
+              <meshStandardMaterial color="#475569" />
+            </mesh>
+          ))}
+        </group>
+      )}
+    </group>
+  )
+}
+
+/**
+ * U-Shaped Automated Sortation Conveyor Table Loop with rollers and moving parcels.
+ */
+export function SortationLoop({ zone }) {
+  const [minX, minY, maxX, maxY] = zone.bounds
+  const cx = (minX + maxX) / 2 + 0.5
+  const cz = (minY + maxY) / 2 + 0.5
+  const width = maxX - minX + 1
+  const depth = maxY - minY + 1
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* U-Shape Conveyor Frame */}
+      {/* Left arm */}
+      <mesh position={[minX + 1.0, 0.76, cz]} castShadow receiveShadow>
+        <boxGeometry args={[0.82, 0.14, depth - 0.2]} />
+        <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Right arm */}
+      <mesh position={[maxX, 0.76, cz]} castShadow receiveShadow>
+        <boxGeometry args={[0.82, 0.14, depth - 0.2]} />
+        <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Bottom connecting loop cross-table */}
+      <mesh position={[cx, 0.76, maxY + 0.5]} castShadow receiveShadow>
+        <boxGeometry args={[width - 0.2, 0.14, 0.82]} />
+        <meshStandardMaterial color="#eab308" metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Galvanized Conveyor Rollers (instanced look) */}
+      {Array.from({ length: 14 }, (_, i) => (
+        <mesh key={`r-bot-${i}`} position={[minX + 0.9 + i * 0.42, 0.84, maxY + 0.5]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.038, 0.038, 0.72, 12]} />
+          <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.2} />
+        </mesh>
+      ))}
+      {/* Conveyor Support Legs */}
+      {[minX + 1.0, maxX].map((lx) =>
+        [minY + 0.5, cz, maxY + 0.5].map((lz, li) => (
+          <mesh key={`${lx}-${li}`} position={[lx, 0.38, lz]}>
+            <boxGeometry args={[0.06, 0.76, 0.06]} />
+            <meshStandardMaterial color="#334155" metalness={0.6} />
+          </mesh>
+        ))
+      )}
+      {/* Sample Parcels on Conveyor Belt */}
+      {[
+        [minX + 1.0, maxY + 0.5],
+        [cx - 0.8, maxY + 0.5],
+        [cx + 0.8, maxY + 0.5],
+        [maxX, maxY + 0.5],
+        [minX + 1.0, cz],
+        [maxX, cz],
+      ].map(([px, pz], pi) => (
+        <mesh key={`box-${pi}`} position={[px, 0.96, pz]} castShadow>
+          <boxGeometry args={[0.38, 0.26, 0.32]} />
+          <meshStandardMaterial color={pi % 2 === 0 ? '#c29b68' : '#d97706'} roughness={0.7} />
+        </mesh>
+      ))}
+      {/* Overhead Hanging Sign */}
+      <Sign at={[cx, 2.7, cz]} title="SORTATION AREA" subtitle="Automated Induction Loop" tone="#0284c7" width={2.4} hang={0.7} />
+    </group>
+  )
+}
+
+/**
+ * Restricted High-Voltage Power Substation with transformers, cabinets, and safety railing.
+ */
+export function RestrictedZone({ zone }) {
+  const [minX, minY, maxX, maxY] = zone.bounds
+  const cx = (minX + maxX) / 2 + 0.5
+  const cz = (minY + maxY) / 2 + 0.5
+  const width = maxX - minX + 1
+  const depth = maxY - minY + 1
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Red Safety Floor Containment Pad */}
+      <mesh position={[cx, 0.015, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, depth]} />
+        <meshBasicMaterial color="#b91c1c" transparent opacity={0.35} depthWrite={false} />
+      </mesh>
+      {/* Yellow/Black Perimeter Hazard Border */}
+      <mesh position={[cx, 0.016, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[Math.min(width, depth) * 0.44, Math.max(width, depth) * 0.52, 4]} />
+        <meshBasicMaterial color="#eab308" transparent opacity={0.75} depthWrite={false} />
+      </mesh>
+      {/* Power Distribution Transformer Cabinets */}
+      {[-1.6, -0.5, 0.6, 1.7].map((offset, i) => (
+        <group key={i} position={[cx + offset, 0, cz]}>
+          <mesh position={[0, 0.85, 0]} castShadow>
+            <boxGeometry args={[0.78, 1.7, 0.82]} />
+            <meshStandardMaterial color="#475569" roughness={0.5} metalness={0.5} />
+          </mesh>
+          <mesh position={[0, 1.72, 0]}>
+            <boxGeometry args={[0.82, 0.06, 0.86]} />
+            <meshStandardMaterial color="#1e293b" />
+          </mesh>
+          {/* Warning high-voltage plate */}
+          <mesh position={[0, 1.15, 0.42]}>
+            <planeGeometry args={[0.24, 0.24]} />
+            <meshBasicMaterial color="#eab308" />
+          </mesh>
+        </group>
+      ))}
+      {/* Perimeter Safety Railings */}
+      {[-width / 2 + 0.1, width / 2 - 0.1].map((rx) => (
+        <mesh key={`post-${rx}`} position={[cx + rx, 0.5, cz]}>
+          <boxGeometry args={[0.04, 1.0, depth]} />
+          <meshStandardMaterial color="#ea580c" roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Overhead Hazard Sign */}
+      <Sign at={[cx, 2.7, cz]} title="RESTRICTED ZONE" subtitle="High Voltage Substation · Authorized Only" tone="#b91c1c" width={2.8} hang={0.7} />
+    </group>
+  )
+}
+
+/**
+ * Stacks of euro-pallets or QA inspection workbenches in auxiliary zones.
+ */
+export function AuxiliaryZone({ zone }) {
+  const [minX, minY, maxX, maxY] = zone.bounds
+  const cx = (minX + maxX) / 2 + 0.5
+  const cz = (minY + maxY) / 2 + 0.5
+  const isPallets = zone.id === 'empty_pallet_zone' || zone.id === 'staging_area'
+
+  return (
+    <group position={[cx, 0, cz]}>
+      {isPallets ? (
+        // Stack of realistic wooden pallets
+        [0, 0.16, 0.32, 0.48, 0.64].map((py, idx) => (
+          <group key={idx} position={[0, py, 0]}>
+            <mesh position={[0, 0.08, 0]} castShadow receiveShadow>
+              <boxGeometry args={[1.2, 0.03, 1.4]} />
+              <meshStandardMaterial color="#d4a373" roughness={0.8} />
+            </mesh>
+            {[-0.5, 0, 0.5].map((bx) => (
+              <mesh key={bx} position={[bx, 0.03, 0]}>
+                <boxGeometry args={[0.12, 0.07, 1.36]} />
+                <meshStandardMaterial color="#b08968" roughness={0.9} />
+              </mesh>
+            ))}
+          </group>
+        ))
+      ) : (
+        // QA inspection / packing workbench
+        <group>
+          <mesh position={[0, 0.74, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.0, 0.06, 1.8]} />
+            <meshStandardMaterial color="#e2e8f0" roughness={0.3} metalness={0.6} />
+          </mesh>
+          {[-0.42, 0.42].map((lx) =>
+            [-0.78, 0.78].map((lz, li) => (
+              <mesh key={`${lx}-${li}`} position={[lx, 0.36, lz]}>
+                <boxGeometry args={[0.04, 0.72, 0.04]} />
+                <meshStandardMaterial color="#64748b" metalness={0.7} />
+              </mesh>
+            ))
+          )}
+          {/* Inspection tool boxes */}
+          <mesh position={[0, 0.88, -0.3]}>
+            <boxGeometry args={[0.4, 0.22, 0.5]} />
+            <meshStandardMaterial color="#94a3b8" />
+          </mesh>
+        </group>
+      )}
+      {/* Overhead Category Sign Badge */}
+      <Sign at={[0, 2.5, 0]} title={zone.name} tone={zone.color} width={1.8} hang={0.6} />
+    </group>
+  )
+}
+
+/**
+ * Storage Quadrant Signage & Corner Safety Bollards (RACK A, B, C, D).
+ */
+export function QuadrantSignAndBollards({ zone }) {
+  const [minX, minY, maxX, maxY] = zone.bounds
+  const cx = (minX + maxX) / 2 + 0.5
+  const cz = (minY + maxY) / 2 + 0.5
+
+  const corners = [
+    [minX - 0.25, minY - 0.25],
+    [maxX + 0.25, minY - 0.25],
+    [minX - 0.25, maxY + 0.25],
+    [maxX + 0.25, maxY + 0.25],
+  ]
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Prominent High-Visibility Overhead Quadrant Sign Badge */}
+      <Sign at={[cx, 3.1, cz]} title={zone.name} tone={zone.color || '#ea580c'} width={2.2} hang={0.65} />
+      {/* Heavy-Duty Industrial Yellow Safety Bollards at Quadrant Corners */}
+      {corners.map(([bx, bz], bi) => (
+        <group key={bi} position={[bx + 0.5, 0, bz + 0.5]}>
+          <mesh position={[0, 0.38, 0]} castShadow>
+            <cylinderGeometry args={[0.07, 0.07, 0.76, 16]} />
+            <meshStandardMaterial color="#eab308" roughness={0.3} />
+          </mesh>
+          {/* Black reflective stripes */}
+          {[0.25, 0.52].map((sy, si) => (
+            <mesh key={si} position={[0, sy, 0]}>
+              <cylinderGeometry args={[0.072, 0.072, 0.08, 16]} />
+              <meshBasicMaterial color="#0f172a" />
+            </mesh>
+          ))}
+          {/* Base plate */}
+          <mesh position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.13, 0.13, 0.04, 16]} />
+            <meshStandardMaterial color="#334155" />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+/**
+ * Painted Roadway Floor Markings: Zebra Crosswalks & Hazard Borders.
+ */
+/**
+ * Painted Roadway Floor Markings: Zebra Crosswalks, Dashed Robot Traffic Lanes, Directional Arrows, and Hazard Borders.
+ */
+export function RoadwayMarkings({ markings = [] }) {
+  return (
+    <group>
+      {markings.map((m, idx) => {
+        if (m.type === 'crosswalk') {
+          const [x1, y1] = m.start
+          const [x2, y2] = m.end
+          const cx = (x1 + x2) / 2 + 0.5
+          const cz = (y1 + y2) / 2 + 0.5
+          const span = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) + 1
+          const count = Math.max(5, Math.round(span * 3.5))
+          return (
+            <group key={`cw-${idx}`} position={[cx, 0.015, cz]}>
+              {Array.from({ length: count }, (_, i) => (
+                <mesh key={i} position={[(i - (count - 1) / 2) * 0.38, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[0.22, 1.2]} />
+                  <meshBasicMaterial color="#ffffff" transparent opacity={0.85} depthWrite={false} />
+                </mesh>
+              ))}
+            </group>
+          )
+        }
+        if (m.type === 'lane_divider') {
+          const [x1, y1] = m.start
+          const [x2, y2] = m.end
+          const isH = y1 === y2
+          const startCoord = isH ? Math.min(x1, x2) : Math.min(y1, y2)
+          const endCoord = isH ? Math.max(x1, x2) : Math.max(y1, y2)
+          const dashes = []
+          for (let c = startCoord; c <= endCoord; c += 1.2) {
+            dashes.push(c)
+          }
+          return (
+            <group key={`ld-${idx}`}>
+              {dashes.map((c, di) => (
+                <mesh
+                  key={di}
+                  position={[isH ? c + 0.5 : x1 + 0.5, 0.014, isH ? y1 + 0.5 : c + 0.5]}
+                  rotation={[-Math.PI / 2, 0, isH ? 0 : Math.PI / 2]}
+                >
+                  <planeGeometry args={[0.65, 0.08]} />
+                  <meshBasicMaterial color="#ffffff" transparent opacity={0.8} depthWrite={false} />
+                </mesh>
+              ))}
+            </group>
+          )
+        }
+        if (m.type === 'arrow') {
+          const [x, y] = m.start
+          const dir = m.direction || 'east'
+          const rotZ = dir === 'east' ? 0 : dir === 'west' ? Math.PI : dir === 'north' ? Math.PI / 2 : -Math.PI / 2
+          return (
+            <group key={`ar-${idx}`} position={[x + 0.5, 0.016, y + 0.5]} rotation={[-Math.PI / 2, 0, rotZ]}>
+              {/* Arrow shaft */}
+              <mesh position={[-0.15, 0, 0]}>
+                <planeGeometry args={[0.45, 0.12]} />
+                <meshBasicMaterial color="#facc15" transparent opacity={0.9} depthWrite={false} />
+              </mesh>
+              {/* Arrow head */}
+              <mesh position={[0.18, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+                <circleGeometry args={[0.22, 3]} />
+                <meshBasicMaterial color="#facc15" transparent opacity={0.9} depthWrite={false} />
+              </mesh>
+            </group>
+          )
+        }
+        if (m.type === 'hazard_border') {
+          const [x1, y1] = m.start
+          const [x2, y2] = m.end
+          const cx = (x1 + x2) / 2 + 0.5
+          const cz = (y1 + y2) / 2 + 0.5
+          const w = Math.abs(x2 - x1) + 1
+          const d = Math.abs(y2 - y1) + 1
+          return (
+            <mesh key={`hb-${idx}`} position={[cx, 0.012, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[w + 0.35, d + 0.35]} />
+              <meshBasicMaterial color="#eab308" transparent opacity={0.25} depthWrite={false} />
+            </mesh>
+          )
+        }
+        return null
+      })}
+    </group>
+  )
+}

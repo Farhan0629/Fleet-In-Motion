@@ -143,7 +143,7 @@ async def main() -> int:
         final is not None
         and stored == total == 12
         and len(emptied) == len(warehouse.tables)
-        and len([s for s in warehouse.rack_slots if s["state"] == "stored"]) == total
+        and len([s for s in warehouse.rack_slots if s["state"] == "stored" and s["task_id"] is not None]) == total
         and not carton_problems
         and not refilled
         and not unstored

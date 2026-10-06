@@ -1,0 +1,773 @@
+{
+  "id": "warehouse_2",
+  "name": "Isometric Smart Operations Hub",
+  "version": "2.0.0",
+  "description": "Smart Operations Hub modeled directly from modern isometric logistics architecture. Features North Inbound Receiving Docks, South Outbound Dispatch Truck Bays, Central Inductive Charging Island, North Sortation Conveyor Loop, South Restricted Electrical/Hazard Zone, and 4 Primary Storage Quadrants (Racks A, B, C, D).",
+  "dimensions": {
+    "width": 28,
+    "height": 16,
+    "cell_size": 1.0
+  },
+  "theme": "bright_industrial",
+  "layout": [
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+    "W...P...P...P...P...P...P..W",
+    "W..........................W",
+    "W..##..##...#....#..##..##.W",
+    "W..##..##...#....#..##..##.W",
+    "W..##..##...######..##..##.W",
+    "W..........................W",
+    "W...........CCCC...........W",
+    "W...........CCCC...........W",
+    "W..........................W",
+    "W..##..##...WWWWWW..##..##.W",
+    "W..##..##...WWWWWW..##..##.W",
+    "W..##..##...WWWWWW..##..##.W",
+    "W..........................W",
+    "W...D...D...D...D...D...D..W",
+    "WWWWWWWWWWWWWWWWWWWWWWWWWWWW"
+  ],
+  "metadata": {
+    "author": "SIH 26123 Team",
+    "created_at": "2026-10-05",
+    "facility_type": "isometric_smart_hub",
+    "unit": "meter"
+  },
+  "operational_settings": {
+    "target_islands": [
+      0,
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "default_num_robots": 3,
+    "robot_starts": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        13
+      ],
+      [
+        26,
+        1
+      ],
+      [
+        26,
+        6
+      ],
+      [
+        26,
+        13
+      ]
+    ]
+  },
+  "stations": [
+    {
+      "id": 0,
+      "code": "T01",
+      "cell": [
+        4,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 1,
+      "code": "T02",
+      "cell": [
+        8,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 2,
+      "code": "T03",
+      "cell": [
+        12,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 3,
+      "code": "T04",
+      "cell": [
+        16,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 4,
+      "code": "T05",
+      "cell": [
+        20,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 5,
+      "code": "T06",
+      "cell": [
+        24,
+        1
+      ],
+      "side": "north",
+      "station_type": "table"
+    },
+    {
+      "id": 6,
+      "code": "T07",
+      "cell": [
+        4,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    },
+    {
+      "id": 7,
+      "code": "T08",
+      "cell": [
+        8,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    },
+    {
+      "id": 8,
+      "code": "T09",
+      "cell": [
+        12,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    },
+    {
+      "id": 9,
+      "code": "T10",
+      "cell": [
+        16,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    },
+    {
+      "id": 10,
+      "code": "T11",
+      "cell": [
+        20,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    },
+    {
+      "id": 11,
+      "code": "T12",
+      "cell": [
+        24,
+        14
+      ],
+      "side": "south",
+      "station_type": "table"
+    }
+  ],
+  "chargers": [
+    {
+      "id": 0,
+      "code": "CHARGE 1",
+      "cell": [
+        12,
+        7
+      ]
+    },
+    {
+      "id": 1,
+      "code": "CHARGE 2",
+      "cell": [
+        13,
+        7
+      ]
+    },
+    {
+      "id": 2,
+      "code": "CHARGE 3",
+      "cell": [
+        14,
+        7
+      ]
+    },
+    {
+      "id": 3,
+      "code": "CHARGE 4",
+      "cell": [
+        15,
+        7
+      ]
+    },
+    {
+      "id": 4,
+      "code": "CHARGE 5",
+      "cell": [
+        12,
+        8
+      ]
+    },
+    {
+      "id": 5,
+      "code": "CHARGE 6",
+      "cell": [
+        13,
+        8
+      ]
+    },
+    {
+      "id": 6,
+      "code": "CHARGE 7",
+      "cell": [
+        14,
+        8
+      ]
+    },
+    {
+      "id": 7,
+      "code": "CHARGE 8",
+      "cell": [
+        15,
+        8
+      ]
+    }
+  ],
+  "zones": [
+    {
+      "id": "receiving_zone",
+      "name": "RECEIVING ZONE",
+      "category": "staging",
+      "bounds": [
+        3,
+        0,
+        25,
+        2
+      ],
+      "color": "#1e3a8a",
+      "metadata": {
+        "docks": 6
+      }
+    },
+    {
+      "id": "dispatch_zone",
+      "name": "DISPATCH ZONE",
+      "category": "staging",
+      "bounds": [
+        3,
+        13,
+        25,
+        15
+      ],
+      "color": "#1e3a8a",
+      "metadata": {
+        "docks": 6
+      }
+    },
+    {
+      "id": "sortation_area",
+      "name": "SORTATION AREA",
+      "category": "sortation",
+      "bounds": [
+        11,
+        3,
+        18,
+        5
+      ],
+      "color": "#0284c7",
+      "metadata": {
+        "equipment": "conveyor_loop"
+      }
+    },
+    {
+      "id": "charging_station",
+      "name": "CHARGING STATION",
+      "category": "charging",
+      "bounds": [
+        11,
+        6,
+        16,
+        9
+      ],
+      "color": "#15803d",
+      "metadata": {
+        "pads": 8
+      }
+    },
+    {
+      "id": "restricted_zone",
+      "name": "RESTRICTED ZONE",
+      "category": "restricted",
+      "bounds": [
+        11,
+        10,
+        18,
+        12
+      ],
+      "color": "#b91c1c",
+      "metadata": {
+        "equipment": "power_cabinets"
+      }
+    },
+    {
+      "id": "rack_a",
+      "name": "RACK A",
+      "category": "storage",
+      "bounds": [
+        3,
+        3,
+        9,
+        5
+      ],
+      "color": "#ea580c"
+    },
+    {
+      "id": "rack_b",
+      "name": "RACK B",
+      "category": "storage",
+      "bounds": [
+        19,
+        3,
+        25,
+        5
+      ],
+      "color": "#ea580c"
+    },
+    {
+      "id": "rack_c",
+      "name": "RACK C",
+      "category": "storage",
+      "bounds": [
+        3,
+        10,
+        9,
+        12
+      ],
+      "color": "#ea580c"
+    },
+    {
+      "id": "rack_d",
+      "name": "RACK D",
+      "category": "storage",
+      "bounds": [
+        19,
+        10,
+        25,
+        12
+      ],
+      "color": "#ea580c"
+    },
+    {
+      "id": "empty_pallet_zone",
+      "name": "EMPTY PALLET ZONE",
+      "category": "auxiliary",
+      "bounds": [
+        1,
+        3,
+        2,
+        5
+      ],
+      "color": "#166534",
+      "metadata": {
+        "asset": "pallets",
+        "count": 6
+      }
+    },
+    {
+      "id": "staging_area",
+      "name": "STAGING AREA",
+      "category": "auxiliary",
+      "bounds": [
+        1,
+        10,
+        2,
+        12
+      ],
+      "color": "#334155",
+      "metadata": {
+        "asset": "staging_pallets"
+      }
+    },
+    {
+      "id": "qa_inspection",
+      "name": "QA / INSPECTION",
+      "category": "auxiliary",
+      "bounds": [
+        26,
+        3,
+        26,
+        5
+      ],
+      "color": "#6b21a8",
+      "metadata": {
+        "asset": "workbench"
+      }
+    },
+    {
+      "id": "packing_area",
+      "name": "PACKING AREA",
+      "category": "auxiliary",
+      "bounds": [
+        26,
+        10,
+        26,
+        12
+      ],
+      "color": "#6b21a8",
+      "metadata": {
+        "asset": "packing_table"
+      }
+    }
+  ],
+  "exterior_assets": [
+    {
+      "type": "dock_door",
+      "position": [
+        4,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        8,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        12,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        16,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        20,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        24,
+        0
+      ],
+      "orientation": "north",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        4,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        8,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        12,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        16,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        20,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "dock_door",
+      "position": [
+        24,
+        15
+      ],
+      "orientation": "south",
+      "color": "#334155"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        4,
+        15
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        8,
+        15
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        12,
+        15
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        16,
+        15
+      ],
+      "orientation": "south",
+      "color": "#1e3a8a"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        20,
+        15
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    },
+    {
+      "type": "freight_truck",
+      "position": [
+        24,
+        15
+      ],
+      "orientation": "south",
+      "color": "#ffffff"
+    }
+  ],
+  "markings": [
+    {
+      "type": "crosswalk",
+      "start": [
+        9,
+        6
+      ],
+      "end": [
+        11,
+        6
+      ]
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        17,
+        6
+      ],
+      "end": [
+        19,
+        6
+      ]
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        9,
+        9
+      ],
+      "end": [
+        11,
+        9
+      ]
+    },
+    {
+      "type": "crosswalk",
+      "start": [
+        17,
+        9
+      ],
+      "end": [
+        19,
+        9
+      ]
+    },
+    {
+      "type": "hazard_border",
+      "start": [
+        11,
+        6
+      ],
+      "end": [
+        16,
+        9
+      ]
+    },
+    {
+      "type": "hazard_border",
+      "start": [
+        11,
+        10
+      ],
+      "end": [
+        18,
+        12
+      ]
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        2,
+        7
+      ],
+      "end": [
+        25,
+        7
+      ]
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        2,
+        8
+      ],
+      "end": [
+        25,
+        8
+      ]
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        2,
+        2
+      ],
+      "end": [
+        25,
+        2
+      ]
+    },
+    {
+      "type": "lane_divider",
+      "start": [
+        2,
+        13
+      ],
+      "end": [
+        25,
+        13
+      ]
+    },
+    {
+      "type": "arrow",
+      "start": [
+        6,
+        7
+      ],
+      "end": [
+        6,
+        7
+      ],
+      "direction": "west"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        21,
+        8
+      ],
+      "end": [
+        21,
+        8
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        6,
+        2
+      ],
+      "end": [
+        6,
+        2
+      ],
+      "direction": "east"
+    },
+    {
+      "type": "arrow",
+      "start": [
+        21,
+        13
+      ],
+      "end": [
+        21,
+        13
+      ],
+      "direction": "west"
+    }
+  ]
+}

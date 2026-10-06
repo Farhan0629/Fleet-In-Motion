@@ -56,13 +56,22 @@ from events import EventLogger
 
 app = FastAPI(title="Edge-AI AMR Fleet Coordination")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-warehouse = Warehouse()
+
+DEFAULT_WAREHOUSE_FILE = os.path.join(os.path.dirname(__file__), "warehouses", "warehouse_1.json")
+if os.path.exists(DEFAULT_WAREHOUSE_FILE):
+    warehouse = Warehouse.compile_from_file(DEFAULT_WAREHOUSE_FILE)
+    if hasattr(warehouse, "environment_report"):
+        print(warehouse.environment_report.summary())
+else:
+    warehouse = Warehouse()
+
 p2p_network = P2PNetwork()
 task_manager = TaskManager(warehouse)
 task_manager.generate_manifest(storage=STORAGE_FLOW_ENABLED)
 metrics = MetricsTracker()
 event_logger = EventLogger()
-ROBOT_STARTS = DEFAULT_ROBOT_STARTS
+ROBOT_STARTS = getattr(warehouse, "robot_starts", None) or DEFAULT_ROBOT_STARTS
+fleet_size = getattr(warehouse, "num_robots", None) or NUM_ROBOTS
 
 
 def demo_battery(index: int) -> float:
@@ -74,13 +83,48 @@ def demo_battery(index: int) -> float:
 
 robots = [
     Robot(i + 1, ROBOT_STARTS[i % len(ROBOT_STARTS)], warehouse, demo_battery(i))
-    for i in range(NUM_ROBOTS)
+    for i in range(fleet_size)
 ]
 for robot in robots:
     p2p_network.register_robot(robot.id)
 sim_state = {"running": False, "paused": False, "tick": 0, "speed": 0.5}
 connected_clients = []
 baseline_running = False
+
+
+def load_and_set_warehouse(warehouse_id: str = "warehouse_1") -> Warehouse:
+    """Dynamically switch the active warehouse environment and re-initialize the fleet."""
+    global warehouse, ROBOT_STARTS, fleet_size, task_manager
+    warehouses_dir = os.path.join(os.path.dirname(__file__), "warehouses")
+    target_file = os.path.join(warehouses_dir, f"{warehouse_id}.json")
+    if os.path.exists(target_file):
+        new_warehouse = Warehouse.compile_from_file(target_file)
+    else:
+        new_warehouse = Warehouse()
+
+    warehouse = new_warehouse
+    ROBOT_STARTS = getattr(warehouse, "robot_starts", None) or DEFAULT_ROBOT_STARTS
+    fleet_size = getattr(warehouse, "num_robots", None) or NUM_ROBOTS
+
+    p2p_network.clear_log()
+    robots.clear()
+    for i in range(fleet_size):
+        r = Robot(i + 1, ROBOT_STARTS[i % len(ROBOT_STARTS)], warehouse, demo_battery(i))
+        robots.append(r)
+        p2p_network.register_robot(r.id)
+        p2p_network.restore_robot(r.id)
+
+    task_manager = TaskManager(warehouse)
+    staged = len(task_manager.generate_manifest(storage=STORAGE_FLOW_ENABLED))
+    metrics.__init__()
+    event_logger.clear()
+    sim_state.update(running=False, paused=False, tick=0, speed=0.5)
+    event_logger.add_event(
+        "system",
+        f"Switched to {warehouse.name} ({warehouse.width}x{warehouse.height}) with {staged} staged cartons across {len(warehouse.tables)} tables.",
+        tick=0,
+    )
+    return warehouse
 
 
 def find_robot(robot_id):
@@ -119,10 +163,13 @@ def pick_choke_cell():
             if usable(x, y):
                 return x, y
 
-    for x in range(8, 12):
-        for y in range(1, warehouse.height - 1):
-            if usable(x, y):
-                return x, y
+    mid_x = warehouse.width // 2
+    for dx in range(-2, 3):
+        x = mid_x + dx
+        if 0 <= x < warehouse.width:
+            for y in range(1, warehouse.height - 1):
+                if usable(x, y):
+                    return x, y
     return None
 
 
@@ -221,8 +268,8 @@ async def simulation_loop():
 async def run_baseline_comparison():
     global baseline_running
     try:
-        baseline_warehouse = Warehouse()
-        baseline_robots = [BaselineRobot(i + 1, ROBOT_STARTS[i % len(ROBOT_STARTS)], baseline_warehouse) for i in range(NUM_ROBOTS)]
+        baseline_warehouse = Warehouse(warehouse.raw_layout)
+        baseline_robots = [BaselineRobot(i + 1, ROBOT_STARTS[i % len(ROBOT_STARTS)], baseline_warehouse) for i in range(fleet_size)]
         # Same fixed manifest as the live demo so both runs move identical packages.
         pairs = zip(baseline_warehouse.pickup_points, reversed(baseline_warehouse.dropoff_points))
         tasks = [{"id": i + 1, "pickup": pickup, "dropoff": dropoff} for i, (pickup, dropoff) in enumerate(pairs)]
@@ -359,6 +406,12 @@ async def websocket_endpoint(ws: WebSocket):
                     robot.battery = float(BATTERY_MAX)
                     event_logger.add_event("charging", f"Boost: {robot.name} state of charge set to {robot.battery:.0f}%", robot_id=robot.id, tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "switch_warehouse":
+                    wid = command.get("warehouse_id", "warehouse_1")
+                    load_and_set_warehouse(wid)
+                    state = build_state_message(0)
+                    state["type"] = "init"
+                    await broadcast_state(state)
                 elif action == "run_baseline" and not baseline_running:
                     baseline_running = True
                     asyncio.create_task(run_baseline_comparison())
@@ -391,6 +444,36 @@ def status():
 @app.get("/api/warehouse")
 def get_warehouse():
     return warehouse.to_serializable()
+
+@app.get("/api/warehouses")
+def list_warehouses():
+    warehouses_dir = os.path.join(os.path.dirname(__file__), "warehouses")
+    results = []
+    if os.path.exists(warehouses_dir):
+        for fname in sorted(os.listdir(warehouses_dir)):
+            if fname.endswith(".json") and fname != "warehouse_schema.json":
+                fpath = os.path.join(warehouses_dir, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    results.append({
+                        "id": data.get("id", fname[:-5]),
+                        "name": data.get("name", fname),
+                        "dimensions": data.get("dimensions", {}),
+                        "description": data.get("description", ""),
+                        "active": getattr(warehouse, "warehouse_id", "") == data.get("id"),
+                    })
+                except Exception:
+                    continue
+    return results
+
+@app.post("/api/warehouses/{warehouse_id}/select")
+async def select_warehouse_endpoint(warehouse_id: str):
+    load_and_set_warehouse(warehouse_id)
+    state = build_state_message(0)
+    state["type"] = "init"
+    await broadcast_state(state)
+    return {"status": "success", "warehouse": warehouse.to_serializable()}
 
 @app.get("/api/metrics")
 def get_metrics():

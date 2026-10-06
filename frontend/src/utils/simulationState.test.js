@@ -58,3 +58,12 @@ test('mission summary reports the round, not a two-leg cycle', () => {
   const mission = getMissionSummary({ total_count: 12, completed_count: 5, pending: [{}, {}], active: [{}], stored_count: 5, in_racks: 5, tables_loaded: 7 })
   assert.deepEqual(mission, { total: 12, completed: 5, active: 1, pending: 2, stored: 5, inRacks: 5, tablesLoaded: 7, progress: 42 })
 })
+
+test('barrier warning takes precedence over carrying status and clears with telemetry', () => {
+  assert.equal(getRobotStatusMeta({ status: 'waiting', has_cargo: true, navigation_message: 'Please remove the barrier' }).label, 'Please remove the barrier')
+  assert.equal(getRobotStatusMeta({ status: 'moving_to_dropoff', has_cargo: true, navigation_message: null }).label, 'Carrying to rack')
+})
+
+test('a barrier-blocked charging unit still displays its claimed pad destination', () => {
+  assert.deepEqual(getRobotNextDestination({ status: 'waiting', charger: [1, 1], task: null, planned_path: [] }), { type: 'CHARGING', coordinate: [1, 1] })
+})

@@ -9,6 +9,8 @@ def a_star(
     start: tuple[int, int],
     goal: tuple[int, int],
     occupied_cells: set[tuple[int, int]] | None = None,
+    *,
+    ignore_barriers: bool = False,
 ) -> list[tuple[int, int]] | None:
     """
     Standard A* pathfinding on 2D grid.
@@ -17,6 +19,8 @@ def a_star(
         warehouse: Warehouse instance (provides is_walkable, get_neighbors)
         start: (x, y) start position
         goal: (x, y) goal position
+        ignore_barriers: Diagnostic search of the building layout only. Never use
+            this route for movement.
         occupied_cells: Optional set of (x,y) cells to treat as temporarily blocked
     
     Returns:
@@ -45,7 +49,13 @@ def a_star(
             path.reverse()
             return path
         
-        for neighbor in warehouse.get_neighbors(current[0], current[1]):
+        if ignore_barriers:
+            x, y = current
+            neighbors = [cell for cell in ((x+1, y), (x-1, y), (x, y+1), (x, y-1))
+                         if warehouse._structurally_walkable(*cell)]
+        else:
+            neighbors = warehouse.get_neighbors(*current)
+        for neighbor in neighbors:
             if neighbor in occupied_cells and neighbor != goal:
                 continue
             

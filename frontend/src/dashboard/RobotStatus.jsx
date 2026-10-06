@@ -61,6 +61,12 @@ export default function RobotStatus({ robot }) {
         </button>
       </div>
 
+      {robot.navigation_message && (
+        <p role="alert" className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+          {robot.navigation_message}
+        </p>
+      )}
+
       <div className="mt-2 h-2 rounded-full bg-slate-200">
         <div
           className={`h-2 rounded-full transition-all ${charging ? 'animate-pulse' : ''}`}

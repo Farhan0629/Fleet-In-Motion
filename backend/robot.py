@@ -15,7 +15,8 @@ from pathfinding import a_star
 
 # How many consecutive blocked ticks a unit tolerates before it stops waiting
 # and asks its onboard planner for a different route.
-REPLAN_AFTER_WAITS = 3
+REPLAN_AFTER_WAITS = 2
+PEER_MEMORY_TICKS = max(3, 3 * P2P_BROADCAST_INTERVAL)
 
 class Robot:
     """
@@ -41,6 +42,12 @@ class Robot:
         self.abandoned_task = None
         self.planned_path = []
         self.path_index = 0
+        self.navigation_message = None
+        self.navigation_blocked_reason = None
+        self._reported_navigation_message = None
+        self._barrier_snapshot = frozenset(warehouse.blocked_cells)
+        self._current_tick = 0
+        self.known_peer_intent_ticks = {}
         
         # Energy state. `target_charger` is the pad this unit has claimed over
         # the mesh; it survives transient "waiting" states, so a unit that is
@@ -83,9 +90,13 @@ class Robot:
         """
         start_time = time.perf_counter()
         
+        self._current_tick = current_tick
+        self._expire_peer_memory(current_tick)
+
         # 1. Process incoming P2P messages
         messages = p2p_network.receive_all(self.id)
         self._process_messages(messages, event_logger, current_tick)
+        self._expire_peer_memory(current_tick)
         
         # 2. Broadcast position & intent at start of tick
         if current_tick % P2P_BROADCAST_INTERVAL == 0:
@@ -98,6 +109,16 @@ class Robot:
         # 4. Decide and act
         action = self._decide_and_act(current_tick, p2p_network, event_logger)
         
+        # Emit only transitions, not one warning per tick.
+        if self.navigation_message != self._reported_navigation_message:
+            if event_logger:
+                event_logger.add_event(
+                    "hazard" if self.navigation_message else "reroute",
+                    f"{self.name}: {self.navigation_message or 'Route available again'}",
+                    robot_id=self.id, tick=current_tick,
+                )
+            self._reported_navigation_message = self.navigation_message
+
         # 5. Update battery
         if action == "moved":
             self.battery = max(0.0, self.battery - BATTERY_DRAIN_PER_MOVE)
@@ -141,12 +162,18 @@ class Robot:
     def _process_messages(self, messages, event_logger=None, tick: int = 0):
         for msg in messages:
             if msg.msg_type == "pos":
+                if msg.payload.get("tick", tick) < self.known_peer_positions.get(msg.sender_id, (0, 0, -1))[2]:
+                    continue
                 self.known_peer_positions[msg.sender_id] = (
                     msg.payload["x"],
                     msg.payload["y"],
-                    msg.payload.get("tick", 0),
+                    msg.payload.get("tick", tick),
                 )
             elif msg.msg_type == "intent":
+                intent_tick = msg.payload.get("tick", tick)
+                if intent_tick < self.known_peer_intent_ticks.get(msg.sender_id, -1):
+                    continue
+                self.known_peer_intent_ticks[msg.sender_id] = intent_tick
                 self.known_peer_intents[msg.sender_id] = msg.payload.get("path", [])
                 self.known_peer_dists[msg.sender_id] = msg.payload.get("dist", len(self.known_peer_intents[msg.sender_id]))
             elif msg.msg_type == "blocked":
@@ -316,13 +343,25 @@ class Robot:
     
     def _decide_and_act(self, tick: int, p2p_network, event_logger=None) -> str:
         self.is_yielding = False
-        
+        # Barrier state is checked locally, including when mesh packets are lost.
+        barriers = frozenset(self.warehouse.blocked_cells)
+        if barriers != self._barrier_snapshot:
+            self._barrier_snapshot = barriers
+            self._replan_path(p2p_network, tick)
+
         # Pad bookings are renegotiated before anything else moves. A unit that
         # is already parked on its pad keeps it - it is physically there.
         if self.target_charger is not None and self.status != "charging" and not self.parked:
             self._resolve_charger_conflict(p2p_network, tick, event_logger)
         
         if self.status == "idle":
+            # Even an idle unit reports a barrier placed around its footprint.
+            enclosed = not self.warehouse.get_neighbors(self.x, self.y)
+            structurally_open = any(self.warehouse._structurally_walkable(*cell)
+                                    for cell in ((self.x+1, self.y), (self.x-1, self.y),
+                                                 (self.x, self.y+1), (self.x, self.y-1)))
+            self.navigation_message = "Please remove the barrier" if enclosed and barriers and structurally_open else None
+            self.navigation_blocked_reason = "barrier" if self.navigation_message else None
             # A parked unit is docked on its pad and stays put.
             if self.parked:
                 return "idle"
@@ -330,8 +369,7 @@ class Robot:
             for peer_id, intent in self.known_peer_intents.items():
                 if intent and (intent[0] == (self.x, self.y) or (self.x, self.y) in intent[:3]):
                     neighbors = self.warehouse.get_neighbors(self.x, self.y)
-                    occupied = set((p[0], p[1]) for p in self.known_peer_positions.values())
-                    occupied |= self._sensed_cells()
+                    occupied = self._occupied_cells()
                     free = [n for n in neighbors if n not in occupied and n != (self.x, self.y)]
                     best_free = [n for n in free if n not in intent]
                     chosen = best_free[0] if best_free else (free[0] if free else None)
@@ -379,17 +417,18 @@ class Robot:
                 return "charged" if gained >= 1.0 else "parked"
             return "charging"
         
-        # Check if already at goal
-        if not self.carrying and self.current_task:
-            if (self.x, self.y) == tuple(self.current_task["pickup"]):
-                return self._handle_arrival(tick, p2p_network)
-        elif self.carrying and self.current_task:
-            if (self.x, self.y) == tuple(self.current_task["dropoff"]):
-                return self._handle_arrival(tick, p2p_network)
-        elif self.target_charger is not None:
+        # A rack transfer may finish from any legal face of the same slot.
+        if self.current_task and self._at_task_goal():
+            return self._handle_arrival(tick, p2p_network)
+        elif self.target_charger is not None and not self.current_task:
             if (self.x, self.y) == self.target_charger:
                 return self._begin_charging(tick, event_logger)
-        
+
+        # Recheck the entire remaining route, not just the next waypoint.
+        if any(not self.warehouse.is_walkable(*cell)
+               for cell in self.planned_path[self.path_index:]):
+            self._replan_path(p2p_network, tick)
+
         # Ensure we have a valid planned path
         if not self.planned_path or self.path_index >= len(self.planned_path):
             self._replan_path(p2p_network, tick)
@@ -422,10 +461,21 @@ class Robot:
             self.is_yielding = True
             self.wait_ticks += 1
             self.consecutive_waits += 1
-            if self.consecutive_waits >= REPLAN_AFTER_WAITS:
-                self._replan_path(p2p_network, tick)
-            return "waited"
-        
+            if self.consecutive_waits < REPLAN_AFTER_WAITS:
+                return "waited"
+            self._replan_path(p2p_network, tick)
+            if not self.planned_path or self.path_index >= len(self.planned_path):
+                return "waited"
+            next_cell = self.planned_path[self.path_index]
+            if self._would_collide(next_cell):
+                return "waited"
+            # A safe detour is available now; do not waste another tick waiting.
+            self.is_yielding = False
+            self.wait_ticks -= 1
+
+        self.navigation_message = None
+        self.navigation_blocked_reason = None
+
         # Clear consecutive wait counter on successful movement
         self.consecutive_waits = 0
         if self.current_task:
@@ -436,16 +486,32 @@ class Robot:
         self._move_to(next_cell, p2p_network, tick)
         self.path_index += 1
         
-        # Check if reached goal after moving
-        if not self.carrying and self.current_task and (self.x, self.y) == tuple(self.current_task["pickup"]):
-            return self._handle_arrival(tick, p2p_network)
-        elif self.carrying and self.current_task and (self.x, self.y) == tuple(self.current_task["dropoff"]):
+        # Check arrival against all rack faces, not a single fixed waypoint.
+        if self.current_task and self._at_task_goal():
             return self._handle_arrival(tick, p2p_network)
         elif self.target_charger is not None and not self.current_task and (self.x, self.y) == self.target_charger:
             return self._begin_charging(tick, event_logger)
-        
+
         return "moved"
     
+    def _expire_peer_memory(self, tick):
+        for peer_id, info in list(self.known_peer_positions.items()):
+            if tick - info[2] > PEER_MEMORY_TICKS:
+                self.known_peer_positions.pop(peer_id, None)
+        for peer_id, seen_tick in list(self.known_peer_intent_ticks.items()):
+            if tick - seen_tick > PEER_MEMORY_TICKS:
+                self.known_peer_intent_ticks.pop(peer_id, None)
+                self.known_peer_intents.pop(peer_id, None)
+                self.known_peer_dists.pop(peer_id, None)
+
+    def _occupied_cells(self):
+        occupied = self._sensed_cells()
+        for px, py, seen_tick in self.known_peer_positions.values():
+            if (self._current_tick - seen_tick <= PEER_MEMORY_TICKS
+                    and abs(px - self.x) + abs(py - self.y) > SENSOR_RANGE):
+                occupied.add((px, py))
+        return occupied
+
     def _sensed_cells(self) -> set[tuple[int, int]]:
         """Cells physically occupied by peers inside onboard sensor range.
 
@@ -463,16 +529,10 @@ class Robot:
     
     def _would_collide(self, next_cell: tuple[int, int]) -> bool:
         # Onboard proximity sensing first — always available.
-        if next_cell in self._sensed_cells():
+        if next_cell in self._occupied_cells():
             return True
         
-        for peer_id, peer_info in self.known_peer_positions.items():
-            px, py = peer_info[0], peer_info[1]
-            
-            # Physical cell is occupied right now
-            if (px, py) == next_cell:
-                return True
-            
+        for peer_id in self.known_peer_intents:
             # Future conflict in lookahead window
             peer_intent = self.known_peer_intents.get(peer_id, [])
             if not peer_intent:
@@ -517,13 +577,7 @@ class Robot:
         if not self.carrying and self.current_task:
             self.carrying = True
             self.status = "moving_to_dropoff"
-            goal = tuple(self.current_task["dropoff"])
-            occupied = set((p[0], p[1]) for p in self.known_peer_positions.values())
-            self.planned_path = a_star(self.warehouse, (self.x, self.y), goal, occupied)
-            if self.planned_path is None:
-                self.planned_path = a_star(self.warehouse, (self.x, self.y), goal)
-            self.path_index = 1 if self.planned_path and len(self.planned_path) > 1 else 0
-            self._broadcast_intent(p2p_network, tick)
+            self._replan_path(p2p_network, tick)
             return "picked_up"
         
         elif self.carrying and self.current_task:
@@ -534,30 +588,75 @@ class Robot:
             self.planned_path = []
             self.path_index = 0
             self.status = "idle"
+            self.navigation_message = None
+            self.navigation_blocked_reason = None
             self._broadcast_position(p2p_network, tick)
             self._broadcast_intent(p2p_network, tick)
             return "delivered"
         
         return "idle"
     
+    def _navigation_goals(self):
+        if not self.current_task:
+            return [self.target_charger] if self.target_charger is not None else []
+        key = "dropoff" if self.carrying else "pickup"
+        preferred = tuple(self.current_task[key])
+        if self.current_task.get(f"{key}_kind") == "rack" and self.current_task.get("slot_cell"):
+            faces = self.warehouse.rack_access_cells(self.current_task["slot_cell"])
+            return sorted(faces, key=lambda cell: (cell != preferred, cell))
+        return [preferred]
+
+    def _set_navigation_goal(self, goal):
+        if self.current_task:
+            key = "dropoff" if self.carrying else "pickup"
+            self.current_task[key] = tuple(goal)
+
+    def _at_task_goal(self):
+        cell = (self.x, self.y)
+        if self.warehouse.is_walkable(*cell) and cell in self._navigation_goals():
+            self._set_navigation_goal(cell)
+            self.navigation_message = None
+            self.navigation_blocked_reason = None
+            return True
+        return False
+
     def _replan_path(self, p2p_network=None, tick: int = 0):
         if not self.current_task and self.target_charger is None:
             self.planned_path = []
             self.path_index = 0
+            self.navigation_message = None
+            self.navigation_blocked_reason = None
             return
         
-        if self.target_charger is not None and not self.current_task:
-            goal = self.target_charger
-        elif self.carrying:
-            goal = tuple(self.current_task["dropoff"])
+        goals = self._navigation_goals()
+        start = (self.x, self.y)
+        # Check every face of a rack slot before declaring its carton blocked.
+        terrain_routes = [(goal, route) for goal in goals
+                          if (route := a_star(self.warehouse, start, goal)) is not None]
+        if not terrain_routes:
+            barrier_caused = bool(self.warehouse.blocked_cells) and any(
+                a_star(self.warehouse, start, goal, ignore_barriers=True) is not None
+                for goal in goals
+            )
+            self.navigation_blocked_reason = "barrier" if barrier_caused else "unreachable"
+            self.navigation_message = "Please remove the barrier" if barrier_caused else "Destination unreachable"
+            path = None
         else:
-            goal = tuple(self.current_task["pickup"])
-        
-        occupied = set((p[0], p[1]) for p in self.known_peer_positions.values())
-        path = a_star(self.warehouse, (self.x, self.y), goal, occupied)
-        if path is None:
-            path = a_star(self.warehouse, (self.x, self.y), goal)
-        
+            self.navigation_message = None
+            self.navigation_blocked_reason = None
+            occupied = self._occupied_cells()
+            if self.consecutive_waits >= REPLAN_AFTER_WAITS:
+                occupied |= {tuple(cell) for intent in self.known_peer_intents.values()
+                             for cell in intent[:3] if self._would_collide(tuple(cell))}
+            safe_routes = [(goal, route) for goal, _ in terrain_routes
+                           if (goal not in occupied or goal == start)
+                           and (route := a_star(self.warehouse, start, goal, occupied)) is not None]
+            # Preserve the current face when reachable; choose another safe face
+            # if blocked. Physical slot identity and cargo reservation never change.
+            goal, path = min(safe_routes or terrain_routes,
+                             key=lambda item: (goals.index(item[0]), len(item[1])))
+            self._set_navigation_goal(goal)
+
         self.planned_path = path or []
         self.path_index = 1 if self.planned_path and len(self.planned_path) > 1 else 0
         if p2p_network:
@@ -569,7 +668,8 @@ class Robot:
             if event_logger:
                 event_logger.add_event(
                     "reroute",
-                    f"{self.name} heard a blocked-aisle alert at {blocked_cell} -> recalculated A* route",
+                    f"{self.name} heard a blocked-aisle alert at {blocked_cell} -> "
+                    f"{self.navigation_message or 'recalculated A* route'}",
                     robot_id=self.id,
                     tick=tick,
                 )
@@ -617,13 +717,8 @@ class Robot:
         self.current_task = task
         self.carrying = False
         self.status = "moving_to_pickup"
-        goal = tuple(task["pickup"])
-        occupied = set((p[0], p[1]) for p in self.known_peer_positions.values())
-        path = a_star(self.warehouse, (self.x, self.y), goal, occupied)
-        if path is None:
-            path = a_star(self.warehouse, (self.x, self.y), goal)
-        self.planned_path = path or []
-        self.path_index = 1 if self.planned_path and len(self.planned_path) > 1 else 0
+        self.consecutive_waits = 0
+        self._replan_path()
     
     def to_dict(self) -> dict:
         remaining_path = self.planned_path[self.path_index:] if self.planned_path else []
@@ -639,6 +734,8 @@ class Robot:
             "battery": round(self.battery, 1),
             "battery_low": self.battery <= BATTERY_LOW_THRESHOLD,
             "status": status_str,
+            "navigation_message": self.navigation_message,
+            "navigation_blocked_reason": self.navigation_blocked_reason,
             "is_yielding": getattr(self, "is_yielding", False),
             "task": self.current_task,
             "has_cargo": self.carrying,

@@ -43,21 +43,49 @@ CHAR_TO_CELL = {
 
 # Island rows are labelled A/B/C from north to south, columns 1..3 from west to
 # east, so a slot address reads like a real warehouse location: B2-03.
-RACK_BANDS = "ABCDEFGH"
+RACK_BANDS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 class Warehouse:
     """Warehouse grid map: neighbor lookup, walkability, and special cells."""
 
-    def __init__(self):
-        self.width = GRID_WIDTH
-        self.height = GRID_HEIGHT
-        self.grid = self._build_grid()
+    def __init__(
+        self,
+        layout: list[str] | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        target_islands: list[int] | None = None,
+        robot_starts: list[tuple[int, int]] | None = None,
+        num_robots: int | None = None,
+        warehouse_id: str | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        theme: str | None = None,
+        zones: list[dict] | None = None,
+        markings: list[dict] | None = None,
+        exterior_assets: list[dict] | None = None,
+    ):
+        if layout is None:
+            layout = LAYOUT
+        self.raw_layout = layout
+        self.height = height if height is not None else len(layout)
+        self.width = width if width is not None else (len(layout[0]) if self.height > 0 else 0)
+        self.warehouse_id = warehouse_id or "warehouse_default"
+        self.name = name or "Warehouse"
+        self.description = description or ""
+        self.theme = theme or "classic_daylight"
+        self.zones = zones or []
+        self.markings = markings or []
+        self.exterior_assets = exterior_assets or []
+        self.target_islands = target_islands
+        self.robot_starts = robot_starts
+        self.num_robots = num_robots
+        self.grid = self._build_grid(layout)
         self.pickup_points = []
         self.dropoff_points = []
         self.charging_stations = []
         self._extract_special_cells()
-        # Twelve staging tables, addressed T01..T12 (west first, north to
+        # Staging tables, addressed T01..Tnn (west first, north to
         # south). A table is either "loaded" (one carton sitting on it) or
         # "empty". It is emptied the moment a unit starts lifting and is never
         # refilled during a round, so a carton can never reappear on a table it
@@ -76,9 +104,82 @@ class Warehouse:
         # cell even when its radio is down, exactly like a real LiDAR bumper.
         self.robot_occupancy: dict[int, tuple[int, int]] = {}
 
-    def _build_grid(self) -> list[list[int]]:
+    @classmethod
+    def from_dict(cls, data: dict) -> "Warehouse":
+        """Create a validated Warehouse instance from a dictionary matching the schema."""
+        from warehouse_schema import WarehouseDefinition
+        definition = WarehouseDefinition.model_validate(data)
+        return cls(
+            layout=definition.layout,
+            width=definition.dimensions.width,
+            height=definition.dimensions.height,
+            target_islands=definition.operational_settings.target_islands,
+            robot_starts=definition.operational_settings.robot_starts,
+            num_robots=definition.operational_settings.default_num_robots,
+            warehouse_id=definition.id,
+            name=definition.name,
+            description=definition.description,
+            theme=definition.theme,
+            zones=[z.model_dump() for z in definition.zones],
+            markings=[m.model_dump() for m in definition.markings],
+            exterior_assets=[a.model_dump() for a in definition.exterior_assets],
+        )
+
+    @classmethod
+    def compile_from_file(cls, path) -> "Warehouse":
+        """Compile and verify a warehouse definition using the EnvironmentEngine."""
+        from environment_engine import EnvironmentEngine
+        wh, report = EnvironmentEngine.compile_file(path)
+        if not report.is_valid:
+            raise ValueError(f"Warehouse topology validation failed:\n{report.summary()}")
+        return wh
+
+    @classmethod
+    def from_file(cls, path) -> "Warehouse":
+        """Create a validated Warehouse instance from a warehouse JSON file."""
+        from warehouse_schema import WarehouseDefinition
+        definition = WarehouseDefinition.from_file(path)
+        return cls(
+            layout=definition.layout,
+            width=definition.dimensions.width,
+            height=definition.dimensions.height,
+            target_islands=definition.operational_settings.target_islands,
+            robot_starts=definition.operational_settings.robot_starts,
+            num_robots=definition.operational_settings.default_num_robots,
+            warehouse_id=definition.id,
+            name=definition.name,
+            description=definition.description,
+        )
+
+    def to_schema_dict(self) -> dict:
+        """Export this Warehouse instance as a dictionary compliant with the schema."""
+        from warehouse_schema import (
+            WarehouseDefinition, WarehouseDimensions, OperationalSettings,
+            StationDefinition, ChargerDefinition
+        )
+        return WarehouseDefinition(
+            id=getattr(self, "warehouse_id", "warehouse_exported"),
+            name=getattr(self, "name", "Exported Warehouse"),
+            dimensions=WarehouseDimensions(width=self.width, height=self.height, cell_size=1.0),
+            layout=self.raw_layout,
+            operational_settings=OperationalSettings(
+                target_islands=getattr(self, "target_islands", None),
+                default_num_robots=getattr(self, "num_robots", 3),
+                robot_starts=getattr(self, "robot_starts", []) or [],
+            ),
+            stations=[
+                StationDefinition(id=t["id"], code=t["code"], cell=t["cell"], side=t["side"], station_type="table")
+                for t in self.tables
+            ],
+            chargers=[
+                ChargerDefinition(id=i, code=f"CHARGE {i+1}", cell=cell)
+                for i, cell in enumerate(self.charging_stations)
+            ],
+        ).model_dump()
+
+    def _build_grid(self, layout: list[str]) -> list[list[int]]:
         grid = []
-        for row_str in LAYOUT:
+        for row_str in layout:
             grid.append([CHAR_TO_CELL.get(ch, EMPTY) for ch in row_str])
         return grid
 
@@ -101,11 +202,12 @@ class Warehouse:
         west = sorted(self.pickup_points, key=lambda cell: (cell[1], cell[0]))
         east = sorted(self.dropoff_points, key=lambda cell: (cell[1], cell[0]))
         for index, cell in enumerate(west + east):
+            is_west = index < len(west) if (west and east) else (cell[0] < self.width / 2)
             self.tables.append({
                 "id": index,
                 "code": f"T{index + 1:02d}",
                 "cell": cell,
-                "side": "west" if index < len(west) else "east",
+                "side": "west" if is_west else "east",
                 "state": "empty",   # "empty" | "loaded"
                 "task_id": None,
             })
@@ -188,7 +290,7 @@ class Warehouse:
         for block in blocks:
             band = bands.index(block[0][1])
             column = columns.index(block[0][0])
-            letter = RACK_BANDS[band] if band < len(RACK_BANDS) else "Z"
+            letter = RACK_BANDS[band] if band < len(RACK_BANDS) else f"R{band + 1}"
             island_code = f"{letter}{column + 1}"
             slot_ids = []
             for number, cell in enumerate(block, start=1):
@@ -223,6 +325,18 @@ class Warehouse:
                 "size": len(block),
                 "slots": slot_ids,
             })
+
+    def rack_access_cells(self, slot_cell) -> list[tuple[int, int]]:
+        """All structural aisle faces of the SAME shelf cell, not nearby slots.
+
+        Keep barriers out of this definition: the robot planner evaluates their
+        live reachability. Never reach diagonally or through another shelf.
+        """
+        x, y = tuple(slot_cell)
+        if not (0 <= x < self.width and 0 <= y < self.height) or self.grid[y][x] != SHELF:
+            return []
+        return [cell for cell in ((x-1, y), (x+1, y), (x, y-1), (x, y+1))
+                if self._structurally_walkable(*cell)]
 
     def get_slot(self, slot_id: int) -> dict | None:
         if slot_id is None or not (0 <= slot_id < len(self.rack_slots)):
@@ -292,6 +406,9 @@ class Warehouse:
 
     def to_serializable(self) -> dict:
         return {
+            "id": getattr(self, "warehouse_id", "warehouse_default"),
+            "name": getattr(self, "name", "Warehouse"),
+            "theme": getattr(self, "theme", "classic_daylight"),
             "width": self.width,
             "height": self.height,
             "grid": self.grid,
@@ -299,6 +416,9 @@ class Warehouse:
             "pickups": self.pickup_points,
             "dropoffs": self.dropoff_points,
             "chargers": self.charging_stations,
+            "zones": getattr(self, "zones", []),
+            "markings": getattr(self, "markings", []),
+            "exterior_assets": getattr(self, "exterior_assets", []),
             "tables": [
                 {
                     "id": table["id"],
