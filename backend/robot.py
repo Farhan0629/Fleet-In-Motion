@@ -48,6 +48,8 @@ class Robot:
         self._barrier_snapshot = frozenset(warehouse.blocked_cells)
         self._current_tick = 0
         self.known_peer_intent_ticks = {}
+        self.available = True
+        self.availability_reason = None
         
         # Energy state. `target_charger` is the pad this unit has claimed over
         # the mesh; it survives transient "waiting" states, so a unit that is
@@ -91,6 +93,9 @@ class Robot:
         start_time = time.perf_counter()
         
         self._current_tick = current_tick
+        if not self.available:
+            self.prev_x, self.prev_y = self.x, self.y
+            return "unavailable"
         self._expire_peer_memory(current_tick)
 
         # 1. Process incoming P2P messages
@@ -601,8 +606,9 @@ class Robot:
             return [self.target_charger] if self.target_charger is not None else []
         key = "dropoff" if self.carrying else "pickup"
         preferred = tuple(self.current_task[key])
-        if self.current_task.get(f"{key}_kind") == "rack" and self.current_task.get("slot_cell"):
-            faces = self.warehouse.rack_access_cells(self.current_task["slot_cell"])
+        slot_cell = self.current_task.get(f"{key}_slot_cell") or self.current_task.get("slot_cell")
+        if self.current_task.get(f"{key}_kind") == "rack" and slot_cell:
+            faces = self.warehouse.rack_access_cells(slot_cell)
             return sorted(faces, key=lambda cell: (cell != preferred, cell))
         return [preferred]
 
@@ -701,7 +707,7 @@ class Robot:
         total_dist = dist_to_pickup + dist_to_dropoff + 1
         battery_factor = self.battery / float(BATTERY_MAX)
         
-        if self.status != "idle" or self.current_task is not None:
+        if not self.available or self.status != "idle" or self.current_task is not None:
             return 0.0
         # A unit parked on its pad at the end of a round is off shift.
         if self.parked:
@@ -719,6 +725,25 @@ class Robot:
         self.status = "moving_to_pickup"
         self.consecutive_waits = 0
         self._replan_path()
+
+    def release_task(self):
+        """Return an uncollected task to the auction without moving cargo."""
+        if self.carrying:
+            raise ValueError("Cannot release a task while carrying its carton")
+        self.current_task = None
+        self.planned_path = []
+        self.path_index = 0
+        self.status = "idle" if self.available else "unavailable"
+        self.navigation_message = None
+        self.navigation_blocked_reason = None
+
+    def set_available(self, available: bool, reason: str | None = None):
+        self.available = bool(available)
+        self.availability_reason = None if self.available else (reason or "operator unavailable")
+        if self.available and self.status == "unavailable":
+            self.status = "idle"
+        elif not self.available and not self.carrying:
+            self.status = "unavailable"
     
     def to_dict(self) -> dict:
         remaining_path = self.planned_path[self.path_index:] if self.planned_path else []
@@ -734,6 +759,8 @@ class Robot:
             "battery": round(self.battery, 1),
             "battery_low": self.battery <= BATTERY_LOW_THRESHOLD,
             "status": status_str,
+            "available": self.available,
+            "availability_reason": self.availability_reason,
             "navigation_message": self.navigation_message,
             "navigation_blocked_reason": self.navigation_blocked_reason,
             "is_yielding": getattr(self, "is_yielding", False),

@@ -54,7 +54,10 @@ def run_putaway_episode(seed: int = 0) -> dict:
         "deadlocks_resolved": 0,
         "replans": 0,
         "messages": 0,
+        "solid_footprint_entries": 0,
     }
+    asrs = next(zone for zone in warehouse.zones if zone["id"] == "asrs_core")
+    min_x, min_y, max_x, max_y = asrs["metadata"]["navigation_footprint"]
     for tick in range(1, 1201):
         tasks.allocate_tasks(fleet, network, None, tick)
         for robot in fleet:
@@ -68,6 +71,8 @@ def run_putaway_episode(seed: int = 0) -> dict:
                 tasks.note_pickup(robot.current_task["id"])
             elif action == "delivered" and robot.last_delivered_task_id:
                 tasks.complete_leg(robot.last_delivered_task_id)
+            if min_x <= robot.x <= max_x and min_y <= robot.y <= max_y:
+                result["solid_footprint_entries"] += 1
 
         result["same_cell_collisions"] += len(detect_collisions(fleet))
         result["swap_collisions"] += count_swaps(fleet)
@@ -140,6 +145,7 @@ class Warehouse3Tests(unittest.TestCase):
         self.assertTrue(all(result["completion_tick"] is not None for result in results))
         self.assertTrue(all(result["same_cell_collisions"] == 0 for result in results))
         self.assertTrue(all(result["swap_collisions"] == 0 for result in results))
+        self.assertTrue(all(result["solid_footprint_entries"] == 0 for result in results))
         self.assertTrue(all(result["tasks"] == 12 for result in results))
 
 

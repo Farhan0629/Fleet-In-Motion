@@ -25,24 +25,65 @@ class Task:
     """
     _counter = 0
 
-    def __init__(self, pickup, dropoff, stage="direct", slot=None, table=None, destination=None):
+    def __init__(
+        self,
+        pickup,
+        dropoff,
+        stage="direct",
+        slot=None,
+        table=None,
+        destination=None,
+        *,
+        pickup_kind="table",
+        dropoff_kind=None,
+        pickup_slot=None,
+        dropoff_slot=None,
+        source_ref=None,
+        destination_ref=None,
+        source_label=None,
+        destination_label=None,
+        priority=3,
+        created_tick=0,
+        max_retries=2,
+        dynamic=False,
+    ):
         Task._counter += 1
         self.id = Task._counter
         self.pickup = pickup
         self.dropoff = dropoff
         self.assigned_to = None  # robot_id or None
-        self.status = "pending"  # "pending" | "assigned" | "completed"
+        self.status = "pending"
         self.stage = stage       # "direct" | "putaway"
         self.origin = pickup                      # table the carton arrived on
         self.destination = destination or dropoff  # where it ends up resting
         self.table_id = table["id"] if table else None
         self.table_code = table["code"] if table else None
-        self.slot_id = slot["id"] if slot else None
-        self.slot_code = slot["code"] if slot else None
-        self.slot_cell = tuple(slot["cell"]) if slot else None
-        self.slot_access = tuple(slot["access"]) if slot else None
-        self.pickup_kind = "table"
-        self.dropoff_kind = "rack" if stage == "putaway" else "table"
+        # `slot` is the original putaway API. Keep it as a destination alias
+        # while representing both ends independently for dynamic rack moves.
+        dropoff_slot = dropoff_slot or slot
+        self.pickup_slot_id = pickup_slot["id"] if pickup_slot else None
+        self.pickup_slot_code = pickup_slot["code"] if pickup_slot else None
+        self.pickup_slot_cell = tuple(pickup_slot["cell"]) if pickup_slot else None
+        self.dropoff_slot_id = dropoff_slot["id"] if dropoff_slot else None
+        self.dropoff_slot_code = dropoff_slot["code"] if dropoff_slot else None
+        self.dropoff_slot_cell = tuple(dropoff_slot["cell"]) if dropoff_slot else None
+        self.slot_id = self.dropoff_slot_id
+        self.slot_code = self.dropoff_slot_code
+        self.slot_cell = self.dropoff_slot_cell
+        self.slot_access = tuple(dropoff_slot["access"]) if dropoff_slot else None
+        self.pickup_kind = pickup_kind
+        self.dropoff_kind = dropoff_kind or ("rack" if stage == "putaway" else "table")
+        self.source_ref = source_ref
+        self.destination_ref = destination_ref
+        self.source_label = source_label or self.table_code or source_ref
+        self.destination_label = destination_label or self.slot_code or destination_ref
+        self.priority = max(1, min(5, int(priority)))
+        self.created_tick = int(created_tick)
+        self.retry_count = 0
+        self.max_retries = max(0, int(max_retries))
+        self.dynamic = bool(dynamic)
+        self.failure_reason = None
+        self.picked_up = False
 
     def as_payload(self) -> dict:
         """What a robot (and the 3D view) needs to know about this carton."""
@@ -57,8 +98,22 @@ class Task:
             "slot_code": self.slot_code,
             "slot_id": self.slot_id,
             "slot_cell": list(self.slot_cell) if self.slot_cell else None,
+            "pickup_slot_id": self.pickup_slot_id,
+            "pickup_slot_code": self.pickup_slot_code,
+            "pickup_slot_cell": list(self.pickup_slot_cell) if self.pickup_slot_cell else None,
+            "dropoff_slot_id": self.dropoff_slot_id,
+            "dropoff_slot_code": self.dropoff_slot_code,
+            "dropoff_slot_cell": list(self.dropoff_slot_cell) if self.dropoff_slot_cell else None,
             "origin": list(self.origin),
             "destination": list(self.destination),
+            "source_ref": self.source_ref,
+            "destination_ref": self.destination_ref,
+            "source_label": self.source_label,
+            "destination_label": self.destination_label,
+            "priority": self.priority,
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "dynamic": self.dynamic,
         }
 
 
@@ -81,6 +136,8 @@ class TaskManager:
         self.pending_tasks: list[Task] = []
         self.active_tasks: list[Task] = []
         self.completed_tasks: list[Task] = []
+        self.cancelled_tasks: list[Task] = []
+        self.failed_tasks: list[Task] = []
         self.all_tasks: list[Task] = []
         self.stored_count = 0
 
@@ -206,6 +263,178 @@ class TaskManager:
         self.all_tasks.append(task)
         return task
 
+    def create_dynamic_task(
+        self,
+        source_ref: str,
+        destination_ref: str,
+        *,
+        priority: int = 3,
+        tick: int = 0,
+        max_retries: int = 2,
+    ) -> Task:
+        """Create one semantic mission without embedding warehouse coordinates."""
+        source = self.warehouse.resolve_semantic_location(source_ref, "pickup")
+        destination = self.warehouse.resolve_semantic_location(destination_ref, "dropoff")
+        if source["cell"] == destination["cell"] and source["kind"] != "rack":
+            raise ValueError("Task source and destination must be different")
+        source_table = source.get("table")
+        if source_table and source_table["state"] != "empty":
+            raise ValueError(f"Source {source['label']} already holds another carton")
+        task = Task(
+            pickup=tuple(source["cell"]),
+            dropoff=tuple(destination["cell"]),
+            stage="dynamic",
+            table=source_table,
+            destination=tuple(
+                destination["slot"]["cell"] if destination.get("slot") else destination["cell"]
+            ),
+            pickup_kind=source["kind"],
+            dropoff_kind=destination["kind"],
+            pickup_slot=source.get("slot"),
+            dropoff_slot=destination.get("slot"),
+            source_ref=source["reference"],
+            destination_ref=destination["reference"],
+            source_label=source["label"],
+            destination_label=destination["label"],
+            priority=priority,
+            created_tick=tick,
+            max_retries=max_retries,
+            dynamic=True,
+        )
+        if source_table:
+            self.warehouse.load_table(source_table["cell"], task.id)
+        if source.get("slot"):
+            source["slot"]["task_id"] = task.id
+        if destination.get("slot") and not self.warehouse.reserve_slot(destination["slot"]["id"], task.id):
+            self._release_source_claim(task)
+            raise ValueError(f"Destination {destination['label']} is no longer available")
+        self.pending_tasks.append(task)
+        self.all_tasks.append(task)
+        self._sort_pending()
+        return task
+
+    def _sort_pending(self):
+        self.pending_tasks.sort(key=lambda task: (-task.priority, task.created_tick, task.id))
+
+    def _release_source_claim(self, task: Task):
+        if task.pickup_kind == "table":
+            self.warehouse.mark_table_empty(task.pickup)
+        elif task.pickup_slot_id is not None:
+            slot = self.warehouse.get_slot(task.pickup_slot_id)
+            if slot and slot["state"] == "stored":
+                slot["task_id"] = None
+
+    def _release_destination(self, task: Task):
+        if task.dropoff_slot_id is not None:
+            slot = self.warehouse.get_slot(task.dropoff_slot_id)
+            if slot and slot["state"] == "reserved" and slot["task_id"] == task.id:
+                self.warehouse.release_slot(task.dropoff_slot_id)
+
+    def _detach_robot(self, task: Task, robots: list):
+        robot = next((item for item in robots if item.id == task.assigned_to), None)
+        if robot:
+            if robot.carrying:
+                raise ValueError("A task cannot be detached while its carton is being carried")
+            robot.release_task()
+        if task in self.active_tasks:
+            self.active_tasks.remove(task)
+        task.assigned_to = None
+        return robot
+
+    def cancel_task(self, task_id: int, robots: list) -> Task:
+        task = self.find_task(task_id)
+        if task is None or task.status in ("completed", "cancelled"):
+            raise ValueError("Task is not cancellable")
+        if task.picked_up:
+            raise ValueError("A picked-up carton must be delivered before cancellation")
+        if task in self.active_tasks:
+            self._detach_robot(task, robots)
+        if task in self.pending_tasks:
+            self.pending_tasks.remove(task)
+        self._release_destination(task)
+        task.status = "cancelled"
+        task.failure_reason = "cancelled by operator"
+        self.cancelled_tasks.append(task)
+        return task
+
+    def reassign_task(self, task_id: int, robots: list) -> Task:
+        task = self.find_task(task_id)
+        if task is None or task.status != "assigned":
+            raise ValueError("Only an assigned task can be reassigned")
+        if task.picked_up:
+            raise ValueError("A picked-up carton cannot be reassigned")
+        self._detach_robot(task, robots)
+        task.status = "pending"
+        self.pending_tasks.append(task)
+        self._sort_pending()
+        return task
+
+    def retry_task(self, task_id: int) -> Task:
+        task = self.find_task(task_id)
+        if task is None or task.status not in ("cancelled", "failed"):
+            raise ValueError("Only a cancelled or failed task can be retried")
+        if task.retry_count >= task.max_retries:
+            raise ValueError("Task retry limit reached")
+        destination = self.warehouse.resolve_semantic_location(task.destination_ref, "dropoff")
+        task.dropoff = tuple(destination["cell"])
+        task.destination = tuple(destination.get("slot", {}).get("cell", destination["cell"]))
+        task.dropoff_kind = destination["kind"]
+        slot = destination.get("slot")
+        task.dropoff_slot_id = slot["id"] if slot else None
+        task.dropoff_slot_code = slot["code"] if slot else None
+        task.dropoff_slot_cell = tuple(slot["cell"]) if slot else None
+        task.slot_id, task.slot_code, task.slot_cell = (
+            task.dropoff_slot_id, task.dropoff_slot_code, task.dropoff_slot_cell
+        )
+        if slot and not self.warehouse.reserve_slot(slot["id"], task.id):
+            raise ValueError("Destination is no longer available")
+        task.retry_count += 1
+        task.failure_reason = None
+        task.status = "pending"
+        task.assigned_to = None
+        if task in self.cancelled_tasks:
+            self.cancelled_tasks.remove(task)
+        if task in self.failed_tasks:
+            self.failed_tasks.remove(task)
+        self.pending_tasks.append(task)
+        self._sort_pending()
+        return task
+
+    def update_destination(self, task_id: int, destination_ref: str) -> Task:
+        task = self.find_task(task_id)
+        if task is None or task.status != "pending":
+            raise ValueError("Destination can only change while a task is pending")
+        destination = self.warehouse.resolve_semantic_location(destination_ref, "dropoff")
+        self._release_destination(task)
+        slot = destination.get("slot")
+        if slot and not self.warehouse.reserve_slot(slot["id"], task.id):
+            raise ValueError("Destination is no longer available")
+        task.destination_ref = destination["reference"]
+        task.destination_label = destination["label"]
+        task.dropoff = tuple(destination["cell"])
+        task.destination = tuple(slot["cell"] if slot else destination["cell"])
+        task.dropoff_kind = destination["kind"]
+        task.dropoff_slot_id = slot["id"] if slot else None
+        task.dropoff_slot_code = slot["code"] if slot else None
+        task.dropoff_slot_cell = tuple(slot["cell"]) if slot else None
+        task.slot_id, task.slot_code, task.slot_cell = (
+            task.dropoff_slot_id, task.dropoff_slot_code, task.dropoff_slot_cell
+        )
+        return task
+
+    def handle_unavailable_robot(self, robot, robots: list) -> Task | None:
+        task = next((item for item in self.active_tasks if item.assigned_to == robot.id), None)
+        if task is None or robot.carrying or task.picked_up:
+            return task
+        self._detach_robot(task, robots)
+        task.status = "pending"
+        self.pending_tasks.append(task)
+        self._sort_pending()
+        return task
+
+    def is_mission_complete(self) -> bool:
+        return bool(self.all_tasks) and not self.pending_tasks and not self.active_tasks
+
     def find_task(self, task_id: int) -> Task | None:
         for task in self.all_tasks:
             if task.id == task_id:
@@ -258,6 +487,7 @@ class TaskManager:
         assignments = []
 
         # 2. Allocate pending tasks to highest bidding idle robots
+        self._sort_pending()
         for task in self.pending_tasks[:]:
             payload = task.as_payload()
             bids = {}
@@ -317,10 +547,11 @@ class TaskManager:
         task = self.find_task(task_id)
         if task is None:
             return False
+        task.picked_up = True
         if task.pickup_kind == "table":
             return self.warehouse.mark_table_empty(task.pickup)
-        if task.slot_id is not None:
-            return self.warehouse.release_slot(task.slot_id)
+        if task.pickup_slot_id is not None:
+            return self.warehouse.release_slot(task.pickup_slot_id)
         return False
 
     def complete_leg(self, task_id: int):
@@ -333,9 +564,9 @@ class TaskManager:
         for task in self.active_tasks[:]:
             if task.id != task_id:
                 continue
-            if task.stage == "putaway" and task.slot_id is not None:
+            if task.dropoff_kind == "rack" and task.dropoff_slot_id is not None:
                 # The slot now physically holds this carton and keeps it.
-                self.warehouse.mark_slot_stored(task.slot_id)
+                self.warehouse.mark_slot_stored(task.dropoff_slot_id)
                 self.stored_count += 1
                 outcome = "stored"
             else:
@@ -361,7 +592,21 @@ class TaskManager:
             "table_code": task.table_code,
             "slot_code": task.slot_code,
             "slot_cell": list(task.slot_cell) if task.slot_cell else None,
+            "pickup_slot_code": task.pickup_slot_code,
+            "pickup_slot_cell": list(task.pickup_slot_cell) if task.pickup_slot_cell else None,
+            "dropoff_slot_code": task.dropoff_slot_code,
+            "dropoff_slot_cell": list(task.dropoff_slot_cell) if task.dropoff_slot_cell else None,
             "destination": list(task.destination),
+            "status": task.status,
+            "priority": task.priority,
+            "source_ref": task.source_ref,
+            "destination_ref": task.destination_ref,
+            "source_label": task.source_label,
+            "destination_label": task.destination_label,
+            "retry_count": task.retry_count,
+            "max_retries": task.max_retries,
+            "dynamic": task.dynamic,
+            "failure_reason": task.failure_reason,
         }
         if with_owner:
             row["assigned_to"] = task.assigned_to
@@ -373,6 +618,8 @@ class TaskManager:
             "pending": [self._serialize(t) for t in self.pending_tasks],
             "active": [self._serialize(t, with_owner=True) for t in self.active_tasks],
             "completed": [self._serialize(t) for t in self.completed_tasks[-20:]],
+            "cancelled": [self._serialize(t) for t in self.cancelled_tasks[-20:]],
+            "failed": [self._serialize(t) for t in self.failed_tasks[-20:]],
             "completed_count": len(self.completed_tasks),
             "total_count": len(self.all_tasks),
             "stored_count": self.stored_count,

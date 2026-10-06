@@ -61,6 +61,7 @@ class Warehouse:
         name: str | None = None,
         description: str | None = None,
         theme: str | None = None,
+        stations: list[dict] | None = None,
         zones: list[dict] | None = None,
         markings: list[dict] | None = None,
         exterior_assets: list[dict] | None = None,
@@ -74,6 +75,7 @@ class Warehouse:
         self.name = name or "Warehouse"
         self.description = description or ""
         self.theme = theme or "classic_daylight"
+        self.semantic_stations = stations or []
         self.zones = zones or []
         self.markings = markings or []
         self.exterior_assets = exterior_assets or []
@@ -120,6 +122,7 @@ class Warehouse:
             name=definition.name,
             description=definition.description,
             theme=definition.theme,
+            stations=[s.model_dump() for s in definition.stations],
             zones=[z.model_dump() for z in definition.zones],
             markings=[m.model_dump() for m in definition.markings],
             exterior_assets=[a.model_dump() for a in definition.exterior_assets],
@@ -149,6 +152,11 @@ class Warehouse:
             warehouse_id=definition.id,
             name=definition.name,
             description=definition.description,
+            theme=definition.theme,
+            stations=[s.model_dump() for s in definition.stations],
+            zones=[z.model_dump() for z in definition.zones],
+            markings=[m.model_dump() for m in definition.markings],
+            exterior_assets=[a.model_dump() for a in definition.exterior_assets],
         )
 
     def to_schema_dict(self) -> dict:
@@ -218,6 +226,100 @@ class Warehouse:
             if table["cell"] == cell:
                 return table
         return None
+
+    def semantic_locations(self) -> list[dict]:
+        """Task-facing locations exposed by warehouse data, not UI coordinates."""
+        locations = [
+            {
+                "id": station["code"],
+                "label": station["code"],
+                "kind": "station",
+                "category": station.get("station_type", "table"),
+            }
+            for station in self.semantic_stations
+        ]
+        locations.extend({
+            "id": zone["id"],
+            "label": zone["name"],
+            "kind": "zone",
+            "category": zone["category"],
+        } for zone in self.zones if zone["category"] != "restricted")
+        return locations
+
+    def resolve_semantic_location(self, reference: str, role: str) -> dict:
+        """Resolve a station/zone name to a real navigation endpoint.
+
+        Storage zones resolve to a physical rack slot. Other zones resolve to
+        the closest walkable cell to their centre. This keeps TaskManager free
+        of warehouse-specific coordinates.
+        """
+        key = str(reference or "").strip().lower()
+        if not key:
+            raise ValueError("Semantic location is required")
+        for station in self.semantic_stations:
+            if key in {str(station.get("id", "")).lower(), station["code"].lower()}:
+                cell = tuple(station["cell"])
+                if not self._structurally_walkable(*cell):
+                    raise ValueError(f"Station {station['code']} is not walkable")
+                table = self.table_at(cell)
+                return {
+                    "reference": station["code"],
+                    "label": station["code"],
+                    "cell": cell,
+                    "kind": "table" if table else "station",
+                    "table": table,
+                    "slot": None,
+                }
+        for zone in self.zones:
+            if key not in {zone["id"].lower(), zone["name"].lower()}:
+                continue
+            min_x, min_y, max_x, max_y = zone["bounds"]
+            if zone["category"] == "storage":
+                candidates = [
+                    slot for slot in self.rack_slots
+                    if min_x <= slot["cell"][0] <= max_x and min_y <= slot["cell"][1] <= max_y
+                    and (
+                        (slot["state"] == "stored" and slot["task_id"] is None)
+                        if role == "pickup" else slot["state"] == "empty"
+                    )
+                ]
+                if not candidates:
+                    raise ValueError(f"No {'stored' if role == 'pickup' else 'empty'} rack slot is available in {zone['name']}")
+                center = ((min_x + max_x) / 2, (min_y + max_y) / 2)
+                slot = min(candidates, key=lambda item: (
+                    abs(item["cell"][0] - center[0]) + abs(item["cell"][1] - center[1]),
+                    item["id"],
+                ))
+                return {
+                    "reference": zone["id"],
+                    "label": zone["name"],
+                    "cell": tuple(slot["access"]),
+                    "kind": "rack",
+                    "table": None,
+                    "slot": slot,
+                }
+            center = ((min_x + max_x) / 2, (min_y + max_y) / 2)
+            candidates = [
+                (x, y)
+                for y in range(min_y, max_y + 1)
+                for x in range(min_x, max_x + 1)
+                if self.is_walkable(x, y)
+            ]
+            if not candidates:
+                raise ValueError(f"Zone {zone['name']} has no walkable task endpoint")
+            cell = min(candidates, key=lambda item: (
+                abs(item[0] - center[0]) + abs(item[1] - center[1]),
+                item[1], item[0],
+            ))
+            return {
+                "reference": zone["id"],
+                "label": zone["name"],
+                "cell": cell,
+                "kind": "zone",
+                "table": self.table_at(cell),
+                "slot": None,
+            }
+        raise ValueError(f"Unknown semantic location: {reference}")
 
     def load_table(self, cell, task_id: int) -> bool:
         """Place the staged carton for `task_id` on the table at `cell`."""
@@ -419,6 +521,7 @@ class Warehouse:
             "zones": getattr(self, "zones", []),
             "markings": getattr(self, "markings", []),
             "exterior_assets": getattr(self, "exterior_assets", []),
+            "semantic_locations": self.semantic_locations(),
             "tables": [
                 {
                     "id": table["id"],

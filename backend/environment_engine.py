@@ -165,6 +165,11 @@ class EnvironmentEngine:
         # 8. Verify Robot Spawn Points
         cls._verify_spawn_points(warehouse, walkable_cells, definition, report)
 
+        # 9. Physical presentation assets must agree with navigation. A semantic
+        # zone may be larger than its machine, but every declared machine
+        # footprint must be structural (wall/shelf), never a driveable aisle.
+        cls._verify_navigation_footprints(warehouse, walkable_cells, report)
+
         # Attach report to warehouse instance
         setattr(warehouse, "environment_report", report)
         return warehouse, report
@@ -298,3 +303,38 @@ class EnvironmentEngine:
             if (sx, sy) in seen_starts:
                 report.warnings.append(f"Duplicate robot start coordinate ({sx},{sy}).")
             seen_starts.add((sx, sy))
+
+    @classmethod
+    def _verify_navigation_footprints(
+        cls, warehouse: Warehouse, walkable_cells: set[tuple[int, int]], report: EnvironmentReport
+    ) -> None:
+        """Validate optional solid-asset footprints declared by semantic zones."""
+        for zone in getattr(warehouse, "zones", []):
+            bounds = (zone.get("metadata") or {}).get("navigation_footprint")
+            if bounds is None:
+                continue
+            if not isinstance(bounds, (list, tuple)) or len(bounds) != 4:
+                report.is_valid = False
+                report.errors.append(
+                    f"Zone {zone.get('id', '<unknown>')} navigation_footprint must be [min_x,min_y,max_x,max_y]."
+                )
+                continue
+            min_x, min_y, max_x, max_y = (int(value) for value in bounds)
+            if min_x > max_x or min_y > max_y or min_x < 0 or min_y < 0 or max_x >= warehouse.width or max_y >= warehouse.height:
+                report.is_valid = False
+                report.errors.append(
+                    f"Zone {zone.get('id', '<unknown>')} navigation_footprint {bounds} is outside the warehouse."
+                )
+                continue
+            leaked = [
+                (x, y)
+                for y in range(min_y, max_y + 1)
+                for x in range(min_x, max_x + 1)
+                if (x, y) in walkable_cells
+            ]
+            if leaked:
+                report.is_valid = False
+                report.errors.append(
+                    f"Zone {zone.get('id', '<unknown>')} solid navigation footprint overlaps "
+                    f"{len(leaked)} walkable cell(s), including {leaked[:4]}."
+                )

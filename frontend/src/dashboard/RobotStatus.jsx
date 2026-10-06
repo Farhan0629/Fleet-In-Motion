@@ -1,6 +1,7 @@
 import useStore from '../store'
 import { getRobotNextDestination, getRobotStatusMeta } from '../utils/simulationState.js'
 import { batteryTone } from '../utils/presentation.js'
+import { sendCommand } from '../websocket.js'
 
 const ACCENTS = ['#315c9f', '#6a86b8', '#3f6aaf', '#506fa8', '#7a8fb9']
 
@@ -88,6 +89,15 @@ export default function RobotStatus({ robot }) {
           {destination ? `${destination.type} (${destination.coordinate[0]},${destination.coordinate[1]})` : 'Awaiting task'}
         </span>
       </p>
+      <button
+        type="button"
+        disabled={robot.has_cargo}
+        onClick={() => sendCommand('set_robot_available', { robot_id: robot.id, available: robot.available === false })}
+        className="mt-2 min-h-9 w-full rounded-md border border-slate-300 px-2 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+        title={robot.has_cargo ? 'Complete the current delivery first' : ''}
+      >
+        {robot.available === false ? 'Return to service' : 'Mark unavailable'}
+      </button>
     </article>
   )
 }

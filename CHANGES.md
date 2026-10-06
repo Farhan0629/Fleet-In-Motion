@@ -181,3 +181,16 @@ Replaced the ASRS placeholder slabs with detailed high-bay racks, visible invent
 frames, lift carriages, elevated conveyors, and safety fencing. Long in-world labels now
 automatically widen and fit their font sizes instead of clipping. Navigation and simulation logic
 were not changed.
+
+---
+
+## Phase 6 — Dynamic semantic tasks
+
+Extended the existing contract-net task manager with priority-aware runtime task creation,
+cancellation, reassignment, retry, pending destination changes, and pre-pickup robot availability.
+Task endpoints are resolved through warehouse stations/zones and use independent pickup/dropoff
+rack slots, so the same lifecycle works in Warehouses #1, #2, and #3.
+
+Also corrected the WH3 ASRS render/navigation mismatch with a compiler-validated generic solid
+navigation footprint. No robot-specific or warehouse-ID-specific coordination branch was added.
+See `PHASE6_DYNAMIC_TASKS.md` for behavior, tests, and limitations.

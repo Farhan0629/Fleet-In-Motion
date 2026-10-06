@@ -389,3 +389,14 @@ through the same warehouse compiler and uses the same robot intelligence as Ware
 Select **WH #3 · ASRS Campus 36×24** under **Facility Topology** in the dashboard. The measured
 Phase 5 topology and deterministic simulation baseline are preserved in
 [`PHASE5_WAREHOUSE3.md`](PHASE5_WAREHOUSE3.md).
+
+## Phase 6: Dynamic semantic tasks
+
+The existing fleet auction now accepts runtime missions expressed as warehouse station or zone
+names rather than UI coordinates. Use **Task queue → Insert semantic task** to choose a source,
+destination, and priority while a demonstration is running. Pending work can change destination;
+uncollected work can be cancelled, retried, or returned to the auction; and idle/pre-pickup robots
+can be marked unavailable without losing their task.
+
+The lifecycle, inventory guarantees, current limitations, and verification commands are recorded
+in [`PHASE6_DYNAMIC_TASKS.md`](PHASE6_DYNAMIC_TASKS.md).

@@ -188,7 +188,6 @@ async def broadcast_state(state):
 
 
 async def simulation_loop():
-    manifest_size = len(task_manager.all_tasks)
     round_reported = {"stored": False}
     while sim_state["running"]:
         if sim_state["paused"]:
@@ -244,11 +243,12 @@ async def simulation_loop():
             resolve_deadlock(robots, deadlocks, warehouse, p2p_network, tick)
         # The round is finished when every staged carton is on a shelf. The
         # fleet then takes itself home: book a pad, dock, charge, park.
-        round_done = bool(manifest_size) and len(task_manager.completed_tasks) >= manifest_size
+        round_done = task_manager.is_mission_complete()
+        mission_size = len(task_manager.all_tasks)
         if round_done and END_OF_ROUND_CHARGE:
             if not round_reported["stored"]:
                 round_reported["stored"] = True
-                event_logger.add_event("system", f"All {manifest_size} packages are on the shelves after {tick} ticks \\u2014 fleet heading to the charging pads", tick=tick)
+                event_logger.add_event("system", f"All {mission_size} active missions are complete after {tick} ticks \\u2014 fleet heading to the charging pads", tick=tick)
             for robot in robots:
                 robot.park_for_charging(p2p_network, tick, event_logger)
         fleet_parked = all(getattr(robot, "parked", False) for robot in robots) if END_OF_ROUND_CHARGE else True
@@ -405,6 +405,51 @@ async def websocket_endpoint(ws: WebSocket):
                     robot = find_robot(int(command["robot_id"]))
                     robot.battery = float(BATTERY_MAX)
                     event_logger.add_event("charging", f"Boost: {robot.name} state of charge set to {robot.battery:.0f}%", robot_id=robot.id, tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "create_task":
+                    task = task_manager.create_dynamic_task(
+                        command.get("source"),
+                        command.get("destination"),
+                        priority=int(command.get("priority", 3)),
+                        tick=sim_state["tick"],
+                        max_retries=int(command.get("max_retries", 2)),
+                    )
+                    event_logger.add_event(
+                        "system",
+                        f"Dynamic task #{task.id} queued: {task.source_label} → {task.destination_label} (priority {task.priority})",
+                        tick=sim_state["tick"],
+                    )
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "cancel_task":
+                    task = task_manager.cancel_task(int(command["task_id"]), robots)
+                    event_logger.add_event("system", f"Task #{task.id} cancelled", tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "reassign_task":
+                    task = task_manager.reassign_task(int(command["task_id"]), robots)
+                    event_logger.add_event("auction", f"Task #{task.id} returned to the fleet auction", tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "retry_task":
+                    task = task_manager.retry_task(int(command["task_id"]))
+                    event_logger.add_event("system", f"Task #{task.id} retry {task.retry_count}/{task.max_retries} queued", tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "update_task_destination":
+                    task = task_manager.update_destination(int(command["task_id"]), command.get("destination"))
+                    event_logger.add_event("system", f"Task #{task.id} destination changed to {task.destination_label}", tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action == "set_robot_available":
+                    robot = find_robot(int(command["robot_id"]))
+                    available = bool(command.get("available"))
+                    if not available and robot.carrying:
+                        raise ValueError("This unit is carrying a carton; complete delivery before making it unavailable")
+                    robot.set_available(available, command.get("reason"))
+                    if not available:
+                        task_manager.handle_unavailable_robot(robot, robots)
+                    event_logger.add_event(
+                        "system",
+                        f"{robot.name} {'returned to service' if available else 'marked unavailable; uncollected work returned to auction'}",
+                        robot_id=robot.id,
+                        tick=sim_state["tick"],
+                    )
                     await broadcast_state(build_state_message(sim_state["tick"]))
                 elif action == "switch_warehouse":
                     wid = command.get("warehouse_id", "warehouse_1")

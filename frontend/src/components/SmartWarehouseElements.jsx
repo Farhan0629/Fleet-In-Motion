@@ -300,13 +300,16 @@ export function AuxiliaryZone({ zone }) {
 }
 
 function AutomatedStorageSystem({ zone }) {
-  const [minX, minY, maxX, maxY] = zone.bounds
+  // `bounds` describes the semantic ASRS area and surrounding service aisle.
+  // Solid geometry is constrained to the compiler-validated navigation
+  // footprint so a valid AMR route can never visually pass through machinery.
+  const [minX, minY, maxX, maxY] = zone.metadata?.navigation_footprint || zone.bounds
   const cx = (minX + maxX) / 2 + 0.5
   const cz = (minY + maxY) / 2 + 0.5
   const zoneWidth = maxX - minX + 1
   const zoneDepth = maxY - minY + 1
-  const width = Math.min(9.4, zoneWidth - 1.2)
-  const depth = Math.min(5.4, zoneDepth - 1.4)
+  const width = Math.max(2.8, zoneWidth - 0.35)
+  const depth = Math.max(2.8, zoneDepth - 0.35)
   const height = 4.55
   const bays = 6
   const levels = 5
@@ -323,24 +326,18 @@ function AutomatedStorageSystem({ zone }) {
     const centerX = cx + side * (width / 2 + length / 2)
     const endX = cx + side * (width / 2 + length)
     return <group key={side}>
-      <mesh position={[centerX, 2.0, cz]} castShadow receiveShadow>
+      <mesh position={[centerX, 2.65, cz]} castShadow receiveShadow>
         <boxGeometry args={[length, 0.16, 1.05]} />
         <meshStandardMaterial color="#64748b" metalness={0.7} roughness={0.32} />
       </mesh>
       {Array.from({ length: 12 }, (_, index) => {
         const x = centerX - length / 2 + 0.2 + index * ((length - 0.4) / 11)
-        return <mesh key={index} position={[x, 2.11, cz]} rotation={[Math.PI / 2, 0, 0]}>
+        return <mesh key={index} position={[x, 2.76, cz]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.045, 0.045, 0.9, 10]} />
           <meshStandardMaterial color="#cbd5e1" metalness={0.82} roughness={0.18} />
         </mesh>
       })}
-      {[centerX - length * 0.34, centerX + length * 0.34].map((x) => <group key={x}>
-        {[-0.43, 0.43].map((zOffset) => <mesh key={zOffset} position={[x, 0.98, cz + zOffset]}>
-          <boxGeometry args={[0.09, 1.96, 0.09]} />
-          <meshStandardMaterial color="#475569" metalness={0.65} roughness={0.38} />
-        </mesh>)}
-      </group>)}
-      <mesh position={[endX - side * 0.45, 2.33, cz]} castShadow>
+      <mesh position={[endX - side * 0.45, 2.98, cz]} castShadow>
         <boxGeometry args={[0.58, 0.42, 0.68]} />
         <meshStandardMaterial color="#c9965f" roughness={0.82} />
       </mesh>
@@ -350,7 +347,7 @@ function AutomatedStorageSystem({ zone }) {
   return <group>
     {/* Reinforced foundation and high-bay rack shell. */}
     <mesh position={[cx, 0.055, cz]} receiveShadow>
-      <boxGeometry args={[width + 1.4, 0.11, depth + 1.4]} />
+      <boxGeometry args={[width + 0.25, 0.11, depth + 0.25]} />
       <meshStandardMaterial color="#64748b" roughness={0.78} metalness={0.2} />
     </mesh>
     {[frontZ, backZ].map((faceZ, faceIndex) => <group key={faceZ}>
@@ -378,7 +375,7 @@ function AutomatedStorageSystem({ zone }) {
     </mesh>)}
     {/* Twin yellow stacker-crane portals and visible lift carriages. */}
     {[-1, 1].map((side) => {
-      const x = cx + side * (width / 2 + 0.48)
+      const x = cx + side * (width / 2 - 0.16)
       return <group key={side}>
         {[frontZ, backZ].map((z) => <mesh key={z} position={[x, height / 2, z]} castShadow>
           <boxGeometry args={[0.2, height, 0.2]} />
@@ -403,17 +400,17 @@ function AutomatedStorageSystem({ zone }) {
     {/* Yellow safety fence across the operator-facing edge. */}
     {Array.from({ length: 11 }, (_, index) => {
       const x = cx - (width + 1.0) / 2 + index * ((width + 1.0) / 10)
-      return <mesh key={x} position={[x, 0.55, frontZ + 0.72]}>
+      return <mesh key={x} position={[x, 0.55, frontZ + 0.12]}>
         <boxGeometry args={[0.07, 1.1, 0.07]} />
         <meshStandardMaterial color="#eab308" roughness={0.35} />
       </mesh>
     })}
-    {[0.34, 0.72, 1.04].map((level) => <mesh key={level} position={[cx, level, frontZ + 0.72]}>
+    {[0.34, 0.72, 1.04].map((level) => <mesh key={level} position={[cx, level, frontZ + 0.12]}>
       <boxGeometry args={[width + 1.05, 0.065, 0.065]} />
       <meshStandardMaterial color="#eab308" roughness={0.35} />
     </mesh>)}
     <Sign
-      at={[cx, 5.35, frontZ + 0.35]}
+      at={[cx, 5.35, frontZ + 0.18]}
       title={zone.name}
       subtitle="High-bay automated storage & retrieval"
       tone={zone.color || '#b91c1c'}
@@ -433,11 +430,14 @@ export function QuadrantSignAndBollards({ zone }) {
   const cz = (minY + maxY) / 2 + 0.5
   const isAsrs = zone.metadata?.automation === 'asrs'
 
+  const [physicalMinX, physicalMinY, physicalMaxX, physicalMaxY] = isAsrs
+    ? zone.metadata.navigation_footprint
+    : zone.bounds
   const corners = [
-    [minX - 0.25, minY - 0.25],
-    [maxX + 0.25, minY - 0.25],
-    [minX - 0.25, maxY + 0.25],
-    [maxX + 0.25, maxY + 0.25],
+    [physicalMinX - 0.25, physicalMinY - 0.25],
+    [physicalMaxX + 0.25, physicalMinY - 0.25],
+    [physicalMinX - 0.25, physicalMaxY + 0.25],
+    [physicalMaxX + 0.25, physicalMaxY + 0.25],
   ]
 
   return (

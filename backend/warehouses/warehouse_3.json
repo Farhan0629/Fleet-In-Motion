@@ -376,7 +376,13 @@
       ],
       "color": "#b91c1c",
       "metadata": {
-        "automation": "asrs"
+        "automation": "asrs",
+        "navigation_footprint": [
+          15,
+          8,
+          20,
+          13
+        ]
       }
     },
     {
