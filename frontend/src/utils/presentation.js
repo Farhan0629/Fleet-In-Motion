@@ -23,6 +23,25 @@ export const rackSlotWorldPosition = (slot, shelfView = 'lowRack') => [
 // floor and the upper deck at chest height, so the hands have to meet the shelf.
 export const RACK_STATION_LOW = Object.freeze([0, rackCartonCenterY('lowRack'), 0.44])
 export const RACK_STATION_HIGH = Object.freeze([0, rackCartonCenterY('standard'), 0.44])
+export function stationFixtureLayout(side = 'west') {
+  const distance = 0.58
+  const direction = {
+    north: [0, -1],
+    south: [0, 1],
+    west: [-1, 0],
+    east: [1, 0],
+  }[side] || [-1, 0]
+  const northSouth = direction[1] !== 0
+  const offset = [direction[0] * distance, direction[1] * distance]
+  return {
+    offset,
+    topSize: northSouth ? [0.70, 0.05, 0.28] : [0.28, 0.05, 0.70],
+    legOffsets: northSouth
+      ? [[-0.27, offset[1]], [0.27, offset[1]]]
+      : [[offset[0], -0.27], [offset[0], 0.27]],
+    cargoRotation: northSouth ? 0 : Math.PI / 2,
+  }
+}
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 export const smooth = (v) => { const t = clamp(v); return t * t * (3 - 2 * t) }
 // Model faces +Z; backend heading 0 means +X.

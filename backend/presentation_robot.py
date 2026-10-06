@@ -45,7 +45,16 @@ class PresentationRobot(Robot):
             station = list(task["dropoff" if self.carrying else "pickup"])
             place = task.get("dropoff_kind" if self.carrying else "pickup_kind", "table")
             slot_cell = task.get(f"{kind}_slot_cell") or task.get("slot_cell")
-            target = list(slot_cell) if (place == "rack" and slot_cell) else station
+            if place == "rack" and slot_cell:
+                target = list(slot_cell)
+            else:
+                direction = {
+                    "north": (0, -1),
+                    "south": (0, 1),
+                    "west": (-1, 0),
+                    "east": (1, 0),
+                }.get(task.get(f"{kind}_side") or task.get("table_side"), (1, 0))
+                target = [station[0] + direction[0], station[1] + direction[1]]
             self.handling = {
                 "kind": kind,
                 "task_id": task["id"],

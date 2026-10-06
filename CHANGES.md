@@ -206,3 +206,10 @@ the machine core; dock ramps and aisle bollards were removed.
 The corrected topology remains connected. Three headless episodes and one complete live-server
 episode completed all 12 putaway tasks with zero collisions and zero positions or published paths
 inside declared solid footprints. The previous Phase 5 baseline remains documented separately.
+
+### Final table approach clearance
+
+Preserved station service-side metadata in the runtime warehouse and moved table fixtures out of
+their robot service cells. North/south/east/west tables now orient consistently, and handling
+animation faces the real fixture side. This prevents robots from visually walking through tables
+without changing A*, task allocation, or warehouse-specific robot behavior.

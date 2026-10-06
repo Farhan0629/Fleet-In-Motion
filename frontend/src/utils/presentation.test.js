@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { RIG, CARRY, STATION, CARTON_SIZE, RACK_DECK_LEVELS, RACK_DECK_THICKNESS, rackCartonCenterY, rackSlotWorldPosition, headingToYaw, angleDelta, createMotion, queueMotion, advanceMotion, transferPose, chooseFollowRobot } from './presentation.js'
+import { RIG, CARRY, STATION, CARTON_SIZE, RACK_DECK_LEVELS, RACK_DECK_THICKNESS, rackCartonCenterY, rackSlotWorldPosition, stationFixtureLayout, headingToYaw, angleDelta, createMotion, queueMotion, advanceMotion, transferPose, chooseFollowRobot } from './presentation.js'
 import { getRobotStatusMeta, mapCargoLifecycle, getRobotNextDestination } from './simulationState.js'
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`)
 test('rig chest is below head and above hips in a single coordinate space', () => {
@@ -41,6 +41,16 @@ test('pickup and dropoff positions meet the same station and hand endpoints', ()
   assert.deepEqual(transferPose({ kind: 'pickup', progress: 1 }).position, [...CARRY])
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 0 }).position, [...CARRY])
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 1 }).position, [...STATION])
+})
+test('table fixtures leave service and neighboring aisle centers clear', () => {
+  for (const side of ['north', 'south', 'west', 'east']) {
+    const layout = stationFixtureLayout(side)
+    const northSouth = side === 'north' || side === 'south'
+    const normalSize = northSouth ? layout.topSize[2] : layout.topSize[0]
+    const distance = Math.abs(northSouth ? layout.offset[1] : layout.offset[0])
+    assert.ok(distance - normalSize / 2 > 0.3, `${side} table intersects its service position`)
+    assert.ok(1 - distance - normalSize / 2 > 0.25, `${side} table intersects the neighboring aisle center`)
+  }
 })
 test('rack-slot placement rests every carton on the selected deck', () => {
   const slots = [

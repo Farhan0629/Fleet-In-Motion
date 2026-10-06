@@ -36,6 +36,8 @@ class Task:
         *,
         pickup_kind="table",
         dropoff_kind=None,
+        pickup_side=None,
+        dropoff_side=None,
         pickup_slot=None,
         dropoff_slot=None,
         source_ref=None,
@@ -58,6 +60,7 @@ class Task:
         self.destination = destination or dropoff  # where it ends up resting
         self.table_id = table["id"] if table else None
         self.table_code = table["code"] if table else None
+        self.table_side = table.get("side") if table else None
         # `slot` is the original putaway API. Keep it as a destination alias
         # while representing both ends independently for dynamic rack moves.
         dropoff_slot = dropoff_slot or slot
@@ -73,6 +76,8 @@ class Task:
         self.slot_access = tuple(dropoff_slot["access"]) if dropoff_slot else None
         self.pickup_kind = pickup_kind
         self.dropoff_kind = dropoff_kind or ("rack" if stage == "putaway" else "table")
+        self.pickup_side = pickup_side or self.table_side
+        self.dropoff_side = dropoff_side
         self.source_ref = source_ref
         self.destination_ref = destination_ref
         self.source_label = source_label or self.table_code or source_ref
@@ -94,7 +99,10 @@ class Task:
             "stage": self.stage,
             "pickup_kind": self.pickup_kind,
             "dropoff_kind": self.dropoff_kind,
+            "pickup_side": self.pickup_side,
+            "dropoff_side": self.dropoff_side,
             "table_code": self.table_code,
+            "table_side": self.table_side,
             "slot_code": self.slot_code,
             "slot_id": self.slot_id,
             "slot_cell": list(self.slot_cell) if self.slot_cell else None,
@@ -212,7 +220,15 @@ class TaskManager:
         dropoffs = list(self.warehouse.dropoff_points)
         targets = list(reversed(dropoffs)) if pairing is None else [dropoffs[index] for index in pairing]
         for pickup, dropoff in zip(pickups, targets):
-            task = Task(pickup=pickup, dropoff=dropoff)
+            source_table = self.warehouse.table_at(pickup)
+            destination_table = self.warehouse.table_at(dropoff)
+            task = Task(
+                pickup=pickup,
+                dropoff=dropoff,
+                table=source_table,
+                pickup_side=source_table.get("side") if source_table else None,
+                dropoff_side=destination_table.get("side") if destination_table else None,
+            )
             self.pending_tasks.append(task)
             self.all_tasks.append(task)
         return list(self.all_tasks)
@@ -290,6 +306,8 @@ class TaskManager:
             ),
             pickup_kind=source["kind"],
             dropoff_kind=destination["kind"],
+            pickup_side=source.get("side"),
+            dropoff_side=destination.get("side"),
             pickup_slot=source.get("slot"),
             dropoff_slot=destination.get("slot"),
             source_ref=source["reference"],
@@ -589,7 +607,10 @@ class TaskManager:
             "stage": task.stage,
             "pickup_kind": task.pickup_kind,
             "dropoff_kind": task.dropoff_kind,
+            "pickup_side": task.pickup_side,
+            "dropoff_side": task.dropoff_side,
             "table_code": task.table_code,
+            "table_side": task.table_side,
             "slot_code": task.slot_code,
             "slot_cell": list(task.slot_cell) if task.slot_cell else None,
             "pickup_slot_code": task.pickup_slot_code,

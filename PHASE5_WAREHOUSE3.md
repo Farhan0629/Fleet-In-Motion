@@ -136,3 +136,11 @@ topology and deterministic result are:
 
 The live server run inspected 323 state frames, including every robot position and every published
 planned-path cell. It completed with zero solid-footprint violations and zero collisions.
+
+### Table service clearance
+
+The runtime now preserves each station's declared `north`, `south`, `east`, or `west` service side.
+Table tops, legs, cartons, and signs are placed toward that fixture side while the marked station
+cell remains a clear robot service position. During pickup/placement dwell, the robot also faces
+the declared fixture side instead of always facing east. Clearance tests cover all four
+orientations and all three warehouse definitions.

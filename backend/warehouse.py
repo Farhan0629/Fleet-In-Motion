@@ -206,16 +206,21 @@ class Warehouse:
     # ─── Staging tables ───────────────────────────────────────────────────
 
     def _extract_tables(self):
-        """Address every table on the floor: T01..T06 west, T07..T12 east."""
+        """Address every table while preserving its data-defined service side."""
         west = sorted(self.pickup_points, key=lambda cell: (cell[1], cell[0]))
         east = sorted(self.dropoff_points, key=lambda cell: (cell[1], cell[0]))
+        station_by_cell = {
+            tuple(station["cell"]): station
+            for station in self.semantic_stations
+        }
         for index, cell in enumerate(west + east):
             is_west = index < len(west) if (west and east) else (cell[0] < self.width / 2)
+            station = station_by_cell.get(tuple(cell))
             self.tables.append({
                 "id": index,
                 "code": f"T{index + 1:02d}",
                 "cell": cell,
-                "side": "west" if is_west else "east",
+                "side": station.get("side") if station else ("west" if is_west else "east"),
                 "state": "empty",   # "empty" | "loaded"
                 "task_id": None,
             })
@@ -267,6 +272,7 @@ class Warehouse:
                     "label": station["code"],
                     "cell": cell,
                     "kind": "table" if table else "station",
+                    "side": station.get("side"),
                     "table": table,
                     "slot": None,
                 }
@@ -295,6 +301,7 @@ class Warehouse:
                     "label": zone["name"],
                     "cell": tuple(slot["access"]),
                     "kind": "rack",
+                    "side": None,
                     "table": None,
                     "slot": slot,
                 }
@@ -316,6 +323,7 @@ class Warehouse:
                 "label": zone["name"],
                 "cell": cell,
                 "kind": "zone",
+                "side": None,
                 "table": self.table_at(cell),
                 "slot": None,
             }

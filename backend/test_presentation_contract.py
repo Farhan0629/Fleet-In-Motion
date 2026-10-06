@@ -93,6 +93,22 @@ class HandlingContract(unittest.TestCase):
         self.assertEqual(handling['target'], [18, 5])
         self.assertEqual(handling['face'], 0)
 
+    def test_table_handling_faces_the_declared_fixture_side(self):
+        expected = {
+            "north": ([17, 4], 270),
+            "south": ([17, 6], 90),
+            "west": ([16, 5], 180),
+            "east": ([18, 5], 0),
+        }
+        for side, (target, face) in expected.items():
+            with self.subTest(side=side):
+                r = module.PresentationRobot(1, (17, 5), None)
+                r.current_task["table_side"] = side
+                r._handle_arrival(10, self.net)
+                handling = r.to_dict()["handling"]
+                self.assertEqual(handling["target"], target)
+                self.assertEqual(handling["face"], face)
+
     def test_end_of_round_dock_waits_for_the_transfer(self):
         """The round finishing must not strand a carton in mid-air."""
         r = self.robot

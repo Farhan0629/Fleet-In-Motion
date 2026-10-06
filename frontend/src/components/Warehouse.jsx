@@ -20,6 +20,7 @@ import {
   RACK_DECK_LEVELS,
   RACK_DECK_THICKNESS,
   rackSlotWorldPosition,
+  stationFixtureLayout,
 } from '../utils/presentation.js'
 function Batch({ items, color, opacity = 1 }) {
   const ref = useRef()
@@ -41,6 +42,8 @@ function Batch({ items, color, opacity = 1 }) {
 function Station({ table, staged, handling }) {
   const [x, z] = table.cell
   const side = table.side || 'west'
+  const fixture = stationFixtureLayout(side)
+  const [fixtureX, fixtureZ] = fixture.offset
   const tone = side === 'north' ? '#1d4ed8' : side === 'south' ? '#1e3a8a' : side === 'west' ? '#a56b1e' : '#2f6a8f'
   const busy = handling.some((h) => h.place !== 'rack' && h.station[0] === x && h.station[1] === z)
   const item = staged || null
@@ -51,12 +54,11 @@ function Station({ table, staged, handling }) {
       : 'Cleared \u00b7 carton in racks'
   return <group position={[x + 0.5, 0, z + 0.5]}>
     <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.96, 0.96]} /><meshBasicMaterial color={tone} transparent opacity={0.16} depthWrite={false} /></mesh>
-    <mesh position={[0.40, 0.745, 0]} receiveShadow><boxGeometry args={[0.32, 0.05, 0.7]} /><meshStandardMaterial color="#61758a" metalness={0.5} roughness={0.4} /></mesh>
-    {[-0.27, 0.27].map((s) => <mesh key={s} position={[0.47, 0.36, s]}><boxGeometry args={[0.035, 0.72, 0.035]} /><meshStandardMaterial color="#8d9da9" /></mesh>)}
-    <mesh position={[0.4, 0.78, -0.34]}><boxGeometry args={[0.32, 0.025, 0.025]} /><meshBasicMaterial color={tone} /></mesh>
-    {!busy && !item && <mesh position={[0.40, 0.776, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.26, 0.4]} /><meshBasicMaterial color={tone} transparent opacity={0.34} depthWrite={false} /></mesh>}
-    {!busy && item && <CargoBox taskId={item.taskId} position={[0.40, 0.91, 0]} rotation={[0, Math.PI / 2, 0]} />}
-    <Sign at={[0.4, 2.14, 0]} title={`TABLE ${table.code}`} subtitle={state} tone={tone} width={1.7} hang={0.55} />
+    <mesh position={[fixtureX, 0.745, fixtureZ]} receiveShadow><boxGeometry args={fixture.topSize} /><meshStandardMaterial color="#61758a" metalness={0.5} roughness={0.4} /></mesh>
+    {fixture.legOffsets.map(([lx, lz]) => <mesh key={`${lx}-${lz}`} position={[lx, 0.36, lz]}><boxGeometry args={[0.035, 0.72, 0.035]} /><meshStandardMaterial color="#8d9da9" /></mesh>)}
+    {!busy && !item && <mesh position={[fixtureX, 0.776, fixtureZ]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[fixture.topSize[0] * 0.72, fixture.topSize[2] * 0.72]} /><meshBasicMaterial color={tone} transparent opacity={0.34} depthWrite={false} /></mesh>}
+    {!busy && item && <CargoBox taskId={item.taskId} position={[fixtureX, 0.91, fixtureZ]} rotation={[0, fixture.cargoRotation, 0]} />}
+    <Sign at={[fixtureX, 2.14, fixtureZ]} title={`TABLE ${table.code}`} subtitle={state} tone={tone} width={1.7} hang={0.55} />
   </group>
 }
 // A charge pad is live infrastructure now: the ring breathes while a unit is

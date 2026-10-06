@@ -129,6 +129,19 @@ class Warehouse3Tests(unittest.TestCase):
             dimensions.append((warehouse.width, warehouse.height))
         self.assertEqual(dimensions, [(20, 20), (28, 16), (36, 24)])
 
+    def test_runtime_tables_preserve_declared_service_sides(self):
+        for warehouse_id in ("warehouse_1", "warehouse_2", "warehouse_3"):
+            with self.subTest(warehouse=warehouse_id):
+                warehouse, _ = EnvironmentEngine.compile_file(SCHEMA_DIR / f"{warehouse_id}.json")
+                declared = {
+                    tuple(station["cell"]): station["side"]
+                    for station in warehouse.semantic_stations
+                }
+                self.assertEqual(
+                    [table["side"] for table in warehouse.tables],
+                    [declared[tuple(table["cell"])] for table in warehouse.tables],
+                )
+
     def test_putaway_targets_multiple_rack_topologies(self):
         warehouse, _ = EnvironmentEngine.compile_file(SCHEMA_DIR / "warehouse_3.json")
         tasks = TaskManager(warehouse)
