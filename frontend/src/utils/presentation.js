@@ -24,7 +24,9 @@ export const rackSlotWorldPosition = (slot, shelfView = 'lowRack') => [
 export const RACK_STATION_LOW = Object.freeze([0, rackCartonCenterY('lowRack'), 0.44])
 export const RACK_STATION_HIGH = Object.freeze([0, rackCartonCenterY('standard'), 0.44])
 export function stationFixtureLayout(side = 'west') {
-  const distance = 0.58
+  // Keep the fixture inside its service cell: near the declared wall/edge,
+  // but clear of both the wall boundary (0.5) and the AMR at cell centre.
+  const distance = 0.38
   const direction = {
     north: [0, -1],
     south: [0, 1],
@@ -35,7 +37,7 @@ export function stationFixtureLayout(side = 'west') {
   const offset = [direction[0] * distance, direction[1] * distance]
   return {
     offset,
-    topSize: northSouth ? [0.70, 0.05, 0.28] : [0.28, 0.05, 0.70],
+    topSize: northSouth ? [0.70, 0.05, 0.18] : [0.18, 0.05, 0.70],
     legOffsets: northSouth
       ? [[-0.27, offset[1]], [0.27, offset[1]]]
       : [[offset[0], -0.27], [offset[0], 0.27]],

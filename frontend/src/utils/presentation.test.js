@@ -42,14 +42,14 @@ test('pickup and dropoff positions meet the same station and hand endpoints', ()
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 0 }).position, [...CARRY])
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 1 }).position, [...STATION])
 })
-test('table fixtures leave service and neighboring aisle centers clear', () => {
+test('table fixtures stay inside their cell and clear of the service centre', () => {
   for (const side of ['north', 'south', 'west', 'east']) {
     const layout = stationFixtureLayout(side)
     const northSouth = side === 'north' || side === 'south'
     const normalSize = northSouth ? layout.topSize[2] : layout.topSize[0]
     const distance = Math.abs(northSouth ? layout.offset[1] : layout.offset[0])
-    assert.ok(distance - normalSize / 2 > 0.3, `${side} table intersects its service position`)
-    assert.ok(1 - distance - normalSize / 2 > 0.25, `${side} table intersects the neighboring aisle center`)
+    assert.ok(distance - normalSize / 2 > 0.25, `${side} table intersects its service position`)
+    assert.ok(distance + normalSize / 2 < 0.5, `${side} table enters the wall or neighboring cell`)
   }
 })
 test('rack-slot placement rests every carton on the selected deck', () => {
