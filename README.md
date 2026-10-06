@@ -1,406 +1,736 @@
-# SIH 26123 — Decentralized Edge-AI AMR Fleet Coordination & 3D Digital Twin
+# Fleet in Motion — Decentralized AMR Fleet Coordination Digital Twin
 
 <div align="center">
 
-![Warehouse Fleet Simulation Banner](./assets/banner.jpg)
+![Fleet in Motion warehouse simulation](./assets/banner.jpg)
 
-**Decentralized Multi-Agent Autonomous Mobile Robot (AMR) Warehouse Simulation with P2P Mesh Coordination, Edge Pathfinding, Dynamic Collision Avoidance, and Real-Time 3D Digital Twin.**
+**SIH26123 — Edge-AI Based Distributed Fleet Coordination for Autonomous Mobile Robots in Smart Warehouses**
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![Three.js](https://img.shields.io/badge/Three.js-R3F-black?style=for-the-badge&logo=three.js&logoColor=white)](https://docs.pmnd.rs/react-three-fiber)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![SIH](https://img.shields.io/badge/Hackathon-SIH_26123-orange?style=for-the-badge)](https://sih.gov.in)
-
-[Key Features](#key-features) • [Architecture](#system-architecture) • [Benchmarks & Empirical Results](#benchmarks--empirical-results) • [Quick Start](#quick-start) • [Demonstration Walkthrough](#demonstration-walkthrough) • [Testing & Verification](#testing--verification) • [Project Structure](#project-structure)
+A data-driven warehouse simulator where autonomous mobile robots plan locally, coordinate through a simulated peer-to-peer mesh, allocate work through bidding, avoid traffic conflicts, recover from selected disruptions, handle cartons, manage battery charging, and stream their state to an interactive 3D digital twin.
 
 </div>
 
 ---
 
-## Overview
+## 1. What this repository is
 
-In traditional automated warehouses, automated guided vehicles (AGVs) and AMRs rely on **centralized dispatch servers** or rigid **stop-and-wait** routing. This model introduces critical vulnerabilities:
-1. **Single Point of Failure**: Server disruptions or network drops halt the entire facility.
-2. **Deadlocks and Livelocks**: Uncoordinated stop-and-wait robots in narrow aisles frequently deadlock permanently when facing one another.
-3. **Wi-Fi Dead Zones**: RF shielding from dense metal storage racks causes packets to drop, causing centralized systems to freeze or risk collisions.
-4. **Latency Bottlenecks**: Centralized route negotiation scales poorly with fleet size.
+Fleet in Motion is a **simulation and validation project** for decentralized multi-robot warehouse coordination. It contains:
 
-**SIH 26123** implements a **decentralized, edge-computed multi-agent coordination architecture** paired with an **interactive WebGL 3D Digital Twin**. Every AMR acts as an autonomous edge compute node that plans routes locally, negotiates traffic dynamically over a peer-to-peer (P2P) mesh, bids on task manifests, resolves deadlocks cooperatively, and degrades gracefully to onboard LiDAR proximity sensing during total communication blackouts.
+- a Python/FastAPI simulation backend;
+- autonomous robot agents with local A* planning;
+- simulated P2P position, intent, hazard, and charger coordination;
+- contract-net-style task allocation using robot-local bids;
+- vertex/swap conflict prevention and deadlock recovery;
+- a declarative warehouse schema and environment compiler;
+- three different warehouse environments using the same robot intelligence;
+- runtime semantic task creation and lifecycle controls;
+- battery, charging, barriers, and Wi-Fi partition drills;
+- a React/Three.js operational digital twin;
+- deterministic regression and benchmark tooling.
 
----
+The main architectural test is:
 
-## Key Features
+> **Different warehouse data → same environment engine → same robot intelligence → working simulation and digital twin.**
 
-### 1. Decentralized Multi-Agent Coordination (Edge AI)
-* **Local Autonomy**: No central routing brain. Robots maintain their own internal belief state, compute their own A* paths, and adapt dynamically to traffic.
-* **P2P Mesh Network**: Robots exchange broadcast and targeted messages (`pos` for positions, `intent` for lookahead paths, `bid` for auction bids, and `blocked` for dynamic hazard gossip).
-* **Distributed Task Auctions**: Staged cargo packages are allocated via a decentralized contract net / bid auction protocol where idle units compute bids based on proximity and battery reserves.
-
-### 2. Rigorous Collision & Deadlock Resolution
-* **Hybrid Conflict Invariants**:
-  * **Vertex Conflicts**: Prevents two robots from occupying the same grid cell.
-  * **Swap Conflicts (Edge Conflicts)**: Prevents two robots from traversing the same edge in opposite directions during the same tick (i.e., driving straight through each other).
-* **Dynamic Lookahead Intent Negotiation**: Robots broadcast their next 5 planned steps (`LOOKAHEAD_WINDOW`). If trajectories intersect within critical zones, units negotiate priority based on remaining distance-to-goal and deterministic tiebreakers.
-* **Polite Yielding**: Idle robots proactively step aside into empty adjacent aisles when an active transport robot approaches.
-* **Cycle Deadlock Detection (DFS)**: Automatically detects circular wait conditions ($A \to B \to C \to A$) using depth-first search on a dynamic wait-for graph. Resolves deadlocks deterministically by having the highest-ID robot yield and back out.
-
-### 3. Wi-Fi Dead Zone Resilience (Graceful Degradation)
-* **Onboard Sensor Fallback**: Simulates onboard LiDAR bumper sensing ($5\text{ m}$ Manhattan range).
-* **Fault Tolerant**: When an AMR enters a simulated radio dead zone (partitioned from P2P traffic), it relies strictly on physical proximity sensing. It safely navigates and avoids collisions without receiving or broadcasting peer packets.
-
-### 4. High-Fidelity 3D Digital Twin (React Three Fiber)
-* **Articulated Humanoid AMRs**: Procedural 3D humanoid robots featuring articulated shoulders, elbows, hips, knees, independent pivot joints, and inverse-kinematic walking swing.
-* **Physical Cargo Handling Dwell**: Robots physically walk up to loading tables, reach out with grippers, lift labeled cartons, carry them secured in front of their torso, and lower them onto delivery tables with a 10-tick dwell animation.
-* **Photorealistic Warehouse Environment**: 20×20 grid floor, instanced high-density pallet racks, loading bays, delivery dispatch tables, floor markings, inductive charging pads, and directional signage.
-* **Dynamic Overlays**:
-  * **P2P Mesh Rays**: Visual beams representing live peer-to-peer radio transmissions.
-  * **Path Trails**: Color-coded planned route projections.
-  * **Hazard Zones**: Real-time barricade rendering on blocked aisles.
-* **Camera Modes**:
-  * `Overview`: Isometric bird's-eye perspective of the full facility.
-  * `Top-down`: 2D orthographic warehouse floor plan view.
-  * `Follow selected`: Third-person tracking camera locked onto a chosen robot.
-  * `Receiving` & `Dispatch`: Dedicated bay vantage points.
-  * `Manual orbit`: Free 360° inspection controls.
-* **Rack Visibility Modes**: `Full racks` (solid industrial warehouse), `X-ray racks` (semi-transparent for tracking obscured robots), and `Low-rack` (clean aisle view).
-
-### 5. Interactive Disruption Drills
-* **Live Aisle Blocking**: Pause the simulation and draw physical barricades directly onto the floor canvas (or click "Auto-block a route"). On resume, the fleet gossips the hazard over the P2P mesh and reroutes on-the-fly using onboard A*.
-* **Wi-Fi Dead Zone Injection**: Cut the radio link of any individual unit with a single click to demonstrate real-time offline survival and LiDAR-based obstacle avoidance.
+This is currently a **software simulation**. It is not a ROS2 driver, a physical AMR controller, a certified safety system, or proof of production readiness.
 
 ---
 
-## System Architecture
+## 2. Current implementation status
+
+### Implemented
+
+- Three validated warehouse definitions: 20×20, 28×16, and 36×24.
+- Warehouse-independent `Robot`, A*, P2P, auction, collision, deadlock, battery, and charging logic.
+- Static putaway demonstrations and runtime semantic task insertion.
+- Task priority, assignment, completion, cancellation, reassignment, retry, and pending destination changes.
+- Temporary aisle barriers and dynamic replanning.
+- Simulated radio partitions with local occupancy sensing fallback.
+- Addressable rack slots with reservation, storage, pickup, and physical carton ownership.
+- Compiler checks for connectivity, station access, rack access, chargers, spawns, and visual/navigation footprint agreement.
+- WebSocket telemetry and operator commands.
+- Interactive 3D visualization, camera modes, route/P2P overlays, robot inspection, and event/metrics panels.
+- Automated backend, frontend, warehouse, presentation, and complete-episode tests.
+
+### Deliberately not implemented yet
+
+- Forced recovery from a robot that fails while physically carrying a carton.
+- General station outage and charging-station outage policies.
+- Validated 5/10/25-robot scalability results.
+- A general CAD, occupancy-map, or arbitrary 3D-model importer.
+- ROS2/Nav2 adapters or commands to physical robots.
+- Production safety certification or real sensor integration.
+
+See [PHASE6_DYNAMIC_TASKS.md](./PHASE6_DYNAMIC_TASKS.md) for the dynamic-task boundary and [PHASE5_WAREHOUSE3.md](./PHASE5_WAREHOUSE3.md) for the Warehouse #3 validation history.
+
+---
+
+## 3. How the system works
 
 ```mermaid
 flowchart TB
-    subgraph Frontend ["Frontend: React 18 + React Three Fiber + Tailwind CSS"]
-        UI["Dashboard & Telemetry Panels<br/>(Controls, Mission Status, Metrics, Event Log)"]
-        Scene["3D Digital Twin Viewport<br/>(Articulated AMRs, Warehouse Racks, Stations)"]
-        Overlays["Visual Overlays<br/>(P2P Mesh Rays, Path Trails, Dynamic Hazards)"]
-        Store["Zustand Global State Store"]
-        WSClient["WebSocket Client Manager<br/>(Auto-reconnect, Ref-counted)"]
+    Definition[Warehouse JSON definition]
+    Compiler[Schema + Environment compiler]
+    Runtime[Runtime Warehouse\nwalkability, slots, stations, zones]
+    Tasks[Task Manager\nmanifest + semantic task lifecycle]
+    Fleet[Robot agents\nlocal A* + bids + battery]
+    Mesh[P2P network simulator\nposition, intent, hazards, chargers]
+    Safety[Conflict and deadlock checks]
+    Server[FastAPI simulation loop]
+    Socket[WebSocket state and commands]
+    Twin[React + Three.js digital twin]
 
-        UI <--> Store
-        Scene <--> Store
-        Overlays <--> Store
-        Store <--> WSClient
-    end
-
-    subgraph Transport ["Full-Duplex Communication"]
-        WS["WebSocket (ws://localhost:8000/ws)<br/>10 Hz State Updates & Operator Commands"]
-        WSClient <==> WS
-    end
-
-    subgraph Backend ["Backend: FastAPI Edge Simulation Engine (Python 3.10+)"]
-        Server["FastAPI WebSocket Server & Dispatcher"]
-        Loop["Simulation Loop (10 Hz Tick Rate)"]
-        TaskManager["Decentralized Task Manager<br/>(Fixed Manifest, Auction Protocol)"]
-        P2P["P2P Mesh Network Simulator<br/>(Async Queues, Partitioning Drills)"]
-        Warehouse["Warehouse Grid Map (20x20)<br/>(Dynamic Obstacles, Walkability, Occupancy)"]
-        Collision["Safety Verifier<br/>(Vertex Conflicts, Swap Conflicts, Deadlock DFS)"]
-        Metrics["Metrics & Event Logger"]
-
-        subgraph Fleet ["Autonomous Edge Robot Agents"]
-            R1["AMR 1: Farhan<br/>(Onboard A*, P2P Inbox, LiDAR Sense)"]
-            R2["AMR 2: Debojyoti<br/>(Onboard A*, P2P Inbox, LiDAR Sense)"]
-            R3["AMR 3: Gaurav<br/>(Onboard A*, P2P Inbox, LiDAR Sense)"]
-        end
-
-        WS <==> Server
-        Server --> Loop
-        Loop --> TaskManager
-        Loop --> Fleet
-        Loop --> Collision
-        Loop --> Metrics
-        Fleet <--> P2P
-        Fleet <--> Warehouse
-    end
+    Definition --> Compiler --> Runtime
+    Runtime --> Tasks
+    Runtime --> Fleet
+    Tasks --> Fleet
+    Fleet <--> Mesh
+    Fleet --> Safety
+    Tasks --> Server
+    Fleet --> Server
+    Safety --> Server
+    Server <--> Socket <--> Twin
 ```
 
----
+### Important separation of responsibilities
 
-## Benchmarks & Empirical Results
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| Warehouse definition | Dimensions, grid, stations, zones, racks, chargers, spawn points, physical footprints | Robot-specific algorithms |
+| Environment compiler | Validation and conversion into a runtime warehouse | Presentation-only special cases |
+| Runtime `Warehouse` | Walkability, barriers, occupancy, semantic resolution, rack/table state | UI state |
+| `Robot` | Local path planning, intent, yielding, battery and charger behavior | Warehouse-ID branches |
+| `TaskManager` | Task lifecycle, slot reservations, priority order and bid allocation | 3D rendering |
+| FastAPI loop | Time progression, command dispatch, state streaming and metrics | Robot route decisions |
+| React digital twin | Visualization and operator interaction | Authoritative simulation state |
 
-The coordination algorithm was evaluated using the **headless benchmark suite** (`backend/test_simulation.py`) against the standard industry baseline.
-
-### Experimental Setup
-* **Episodes**: 100 consecutive deterministic Monte Carlo runs.
-* **Fleet**: 3 Autonomous Mobile Robots.
-* **Grid**: 20×20 discrete warehouse environment with aisle choke points and cross-warehouse cargo routes.
-* **Workload**: Fixed manifest where 6 packages are staged on west loading tables and transported across the floor to east delivery tables. Both algorithms receive identical start coordinates and manifest pairings.
-* **Audit**: Exact verification of vertex collisions (same cell) and swap collisions (simultaneous cross-through), with timeout episodes excluded from time averages.
-
-### Benchmark Results
-
-| Metric | Traditional Stop-and-Wait Baseline | Decentralized Edge-AI Fleet | Improvement / Verdict |
-| :--- | :---: | :---: | :---: |
-| **Same-Cell Collisions** | 0 | **0** | **100% Zero-Collision Guarantee** |
-| **Swap / Edge Collisions** | 0 | **0** | **100% Zero-Collision Guarantee** |
-| **Permanent Deadlocks (Naive)** | **96 / 100 (96%)** | **0 / 100 (0%)** | **Deadlocks Completely Eliminated** |
-| **Completion Rate** | 4% (Naive) / 100% (with backoff) | **100 / 100 (100%)** | **100% Mission Reliability** |
-| **Avg. Ticks (1.0s stall tolerance)** | 100.2 ticks | **81.0 ticks** | **19.2% Faster** |
-| **Avg. Ticks (1.5s stall tolerance)** | 109.6 ticks | **81.0 ticks** | **26.1% Faster** |
-| **Avg. Ticks (2.0s stall tolerance)** | 118.3 ticks | **81.0 ticks** | **31.5% Faster** |
-
-> [!NOTE]
-> Textbook stop-and-wait (plan once, halt when blocked, never replan) deadlocks permanently in 96% of episodes because opposing robots in narrow aisles cannot negotiate. When the baseline is given an industrial backoff escape hatch (re-running A* after $N$ stalled ticks), our decentralized fleet consistently outperforms it by **19.2% to 31.5%** in completion speed while maintaining zero collisions.
+Do not add logic such as `if warehouse_id == "warehouse_3"` to `robot.py`. If a warehouse needs different geometry or semantics, express it in the warehouse definition or improve the shared environment abstraction.
 
 ---
 
-## Quick Start
+## 4. Core simulation behavior
+
+### Robot-local navigation
+
+Each robot calls the shared A* implementation in `backend/pathfinding.py` using:
+
+- its current position;
+- the active warehouse's walkability map;
+- temporary barriers;
+- sensed robot occupancy;
+- current peer intent information.
+
+A route is a sequence of 4-connected grid cells. One grid cell represents one meter by default.
+
+### P2P coordination
+
+`backend/p2p.py` models a peer inbox for every robot. Agents broadcast state to other connected peers. Supported traffic includes:
+
+- `pos`: current cell;
+- `intent`: near-term planned path and remaining distance;
+- `blocked`: a newly discovered closed aisle;
+- `result`: task-auction result;
+- `charger_claim` / `charger_release`: exclusive charging-pad negotiation.
+
+A radio-partitioned robot stops sending and receiving mesh traffic. Collision behavior then falls back to locally sensed occupancy within `SENSOR_RANGE`. This models the behavior; it is not a real radio or LiDAR integration.
+
+### Conflict handling
+
+The simulator protects against:
+
+- **vertex conflict**: two robots ending a tick in the same cell;
+- **swap conflict**: two robots exchanging cells during the same tick;
+- **lookahead conflict**: intersecting near-term intents;
+- **wait-for deadlock**: a cycle such as A waiting for B, B for C, and C for A.
+
+Deadlock detection builds a wait-for graph and uses DFS-style cycle detection. Resolution chooses a deterministic yielding robot, backs it into an available neighboring cell, and replans.
+
+### Task allocation
+
+The task manager asks idle, available robots to calculate bids. A bid combines distance and battery state. The highest valid bid wins with deterministic robot-ID tie-breaking.
+
+Pending tasks are ordered by:
+
+1. priority, highest first;
+2. creation tick;
+3. task ID.
+
+### Carton ownership invariant
+
+A carton must exist in exactly one place:
+
+1. on its source table or rack slot;
+2. in a robot's handling/carrying state;
+3. at its destination rack slot or station.
+
+Rack destinations are reserved before assignment. The source becomes empty when pickup handling begins. A rack destination becomes `stored` only after delivery finishes.
+
+### Battery and charging
+
+Robots drain battery while moving or idling. Below `BATTERY_LOW_THRESHOLD`, an eligible robot negotiates a charging pad over the mesh. Uncollected work can return to the auction. A robot already carrying a carton finishes that delivery before charging. At the end of the demonstration, the fleet books distinct pads, charges, and parks.
+
+---
+
+## 5. Included warehouses
+
+| ID | Name | Size | Purpose |
+| --- | --- | ---: | --- |
+| `warehouse_1` | Standard Demonstration Warehouse | 20×20 | Original compact benchmark and demonstration floor |
+| `warehouse_2` | Isometric Smart Operations Hub | 28×16 | Fulfillment/distribution center with receiving, dispatch, rack quadrants, QA, packing, charging and restricted areas |
+| `warehouse_3` | Automated Cross-Dock & ASRS Campus | 36×24 | Opposing docks, storage banks, sortation, ASRS core, charging court, picking, packing, maintenance and reverse logistics |
+
+All three compile into the same runtime `Warehouse` class and use the same `Robot`, `TaskManager`, pathfinding, P2P, collision, and deadlock code.
+
+Warehouse #3 also uses a physical-clearance contract: custom solid machinery declares navigation footprints, and the compiler rejects any footprint that remains walkable.
+
+---
+
+## 6. Quick start
 
 ### Prerequisites
-* **Python**: 3.10 or higher
-* **Node.js**: 20 or higher (Node 22 LTS recommended)
-* **Package Managers**: `pip` and `npm`
 
----
+- Python 3.10 or newer;
+- Node.js 20 or newer;
+- npm;
+- a browser with WebGL enabled.
 
-### 1. Backend Setup
+Clone and enter the repository:
 
-Open a terminal and start the FastAPI simulation engine:
+```bash
+git clone https://github.com/Farhan0629/Fleet-In-Motion.git
+cd Fleet-In-Motion
+```
+
+### Terminal 1 — backend
+
+#### Windows PowerShell
+
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### macOS/Linux
 
 ```bash
 cd backend
-
-# Install dependencies
-python -m pip install -r requirements.txt
-
-# Start the simulation server on port 8000
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python3 -m pip install -r requirements.txt
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-* Backend API: `http://localhost:8000`
-* WebSocket Endpoint: `ws://localhost:8000/ws`
-* Swagger Documentation: `http://localhost:8000/docs`
+Expected backend URLs:
 
----
+- status: `http://localhost:8000/api/status`
+- API documentation: `http://localhost:8000/docs`
+- WebSocket: `ws://localhost:8000/ws`
 
-### 2. Frontend Setup
-
-In a second terminal, launch the React Three Fiber digital twin:
+### Terminal 2 — frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm ci
-
-# Start the Vite development server
 npm run dev
 ```
 
-* Open your browser at: **`http://localhost:5173`**
-* *(Optional)*: If running the backend on a remote host, set `VITE_WS_URL=ws://<host>:8000/ws` in a `.env` file in `frontend/`.
+Open `http://localhost:5173`.
+
+The connection badge should change to **Connected · Ready**.
+
+### Frontend WebSocket configuration
+
+During local Vite development, the client automatically connects to port `8000`. To use another backend:
+
+```bash
+# frontend/.env
+VITE_WS_URL=ws://your-backend-host:8000/ws
+```
+
+Use `wss://` when the frontend is served over HTTPS.
+
+### Windows `npm ci` EPERM error
+
+If Windows reports that `lightningcss.win32-x64-msvc.node` cannot be unlinked, a Node/Vite process or OneDrive/antivirus scanner is holding it open.
+
+1. Stop every running frontend terminal with `Ctrl+C`.
+2. Close editors or terminals using `frontend/node_modules`.
+3. From `frontend`, run:
+
+```powershell
+Remove-Item -Recurse -Force node_modules
+npm cache verify
+npm ci
+npm run dev
+```
+
+Running the repository outside a continuously synchronized OneDrive folder can also prevent file-lock issues.
 
 ---
 
-## Demonstration Walkthrough
+## 7. Using the digital twin
 
-Follow this step-by-step evaluation guide to explore all system capabilities:
+### Basic demonstration
 
-```
-+-----------------------------------------------------------------------------+
-|                               DEMO WORKFLOW                                 |
-|                                                                             |
-|  [1. Start Demo]  -->  [2. Select Unit & Follow]  -->  [3. Observe Pickup]  |
-|         |                                                       |           |
-|         v                                                       v           |
-|  [4. Disruption Drill: Barricade]                 [5. Disruption Drill: RF] |
-|   * Pause simulation                               * Toggle Dead Zone       |
-|   * Paint barrier across aisle                     * Unit navigates via     |
-|   * Resume & observe A* reroute                      onboard LiDAR bumper   |
-+-----------------------------------------------------------------------------+
-```
+1. Select a warehouse under **Facility topology**.
+2. Choose a playback speed.
+3. Click **Start demonstration**.
+4. Select a robot to inspect its status, cargo, battery, task and next destination.
+5. Use **Follow selected**, **Robot's POV**, **Top-down**, or **Manual orbit**.
+6. Enable route and P2P overlays when debugging coordination.
+7. Observe each carton move from a staged table to its reserved rack slot.
+8. After the final putaway, observe charger negotiation and fleet parking.
 
-1. **Initial Inspection**:
-   * Open `http://localhost:5173`. Confirm the connection badge displays **`Connected · Ready`**.
-   * Notice the 6 packages staged on the West loading tables (`LOADING 1` to `LOADING 6`).
-2. **Start Simulation**:
-   * Set playback speed to `0.5x` or `0.25x` for clear observation.
-   * Click **`Start demonstration`**.
-3. **Inspect Cargo Transfer Dwell**:
-   * Click on robot card **Farhan** in the dashboard and select **`Follow selected`** in Camera Presets.
-   * Watch the unit navigate to its assigned loading table. Notice the 10-tick handling dwell: the robot reaches out its grippers, secures carton `#1`, lifts it, and turns towards the destination.
-   * The package is carried directly in front of the torso during transport.
-4. **Disruption Drill 1: Dynamic Aisle Barricade**:
-   * Click **`Pause`**.
-   * Click **`Place barriers`** in the Disruption Drills section.
-   * Click or drag across an active aisle to create physical obstacles.
-   * Click **`Resume`**.
-   * Watch the fleet gossip the blocked cells over the P2P mesh (`hazard` event) and reroute seamlessly using onboard A* without collisions.
-5. **Disruption Drill 2: Wi-Fi Dead Zone Partition**:
-   * Click on **`Farhan ✕`** in the Wi-Fi Dead Zone controls.
-   * The robot loses radio connectivity (P2P packets blocked).
-   * Notice the AMR continues navigating safely, avoiding peer collisions purely via onboard proximity sensing.
-   * Click the button again to reconnect the unit to the mesh.
-6. **Delivery & Completion**:
-   * Follow the unit to `DELIVERY 6` on the East side.
-   * Watch the robot lower and release the carton. Delivery counters update strictly upon physical placement.
+### Disruption drills
+
+- **Barrier**: pause, enable barrier placement, draw on free aisle cells, then resume.
+- **Auto-block route**: asks the server to select a relevant route cell.
+- **Wi-Fi dead zone**: partition or reconnect one robot's simulated mesh radio.
+- **Force high battery**: restore a selected robot to full charge for demonstration purposes.
+- **Unavailable robot**: remove an idle or pre-pickup unit from service; its uncollected work returns to the auction.
+
+Barriers can only be added to free, unoccupied aisle cells while the floor is stopped or paused.
+
+### Dynamic semantic tasks
+
+The **Task queue** panel can insert a task while the simulation is running. Sources and destinations are station or zone identifiers supplied by the active warehouse—not UI coordinates.
+
+Examples:
+
+- Receiving → Rack A
+- Rack C → Packing
+- Packing → Dispatch
+- Receiving → QA
+
+Supported lifecycle operations:
+
+- create;
+- prioritize;
+- assign through bidding;
+- execute and complete;
+- cancel before pickup;
+- return an uncollected assignment to auction;
+- change a pending destination;
+- retry a cancelled or failed task up to its retry limit.
+
+A task already physically carried by a robot cannot be cancelled or reassigned. Forced mid-carry failure recovery is intentionally reserved for later resilience work.
 
 ---
 
-## Testing & Verification
+## 8. Warehouse definition format
 
-The project includes an automated test suite spanning backend contracts, distributed collision invariants, and frontend components:
+Warehouse files live in `backend/warehouses/` and are validated by Pydantic models in `backend/warehouse_schema.py`.
 
-### 1. Headless Simulation Benchmark (100 Episodes)
-Runs 100 full episodes of decentralized fleet coordination vs. baseline:
+### Grid symbols
+
+| Symbol | Meaning |
+| --- | --- |
+| `.` | walkable floor |
+| `#` | shelf/rack cell; not walkable and converted into addressable rack slots when accessible |
+| `W` | wall or solid machinery footprint; not walkable |
+| `P` | pickup/staging service cell |
+| `D` | drop-off/staging service cell |
+| `C` | charging pad |
+
+Every layout row must exactly match `dimensions.width`, and the number of rows must match `dimensions.height`.
+
+### Main definition sections
+
+```json
+{
+  "id": "warehouse_example",
+  "name": "Example Warehouse",
+  "version": "1.0.0",
+  "dimensions": { "width": 20, "height": 12, "cell_size": 1.0 },
+  "theme": "bright_industrial",
+  "layout": ["..."],
+  "operational_settings": {
+    "default_num_robots": 3,
+    "robot_starts": [[1, 1], [1, 5], [1, 9]],
+    "target_islands": [0]
+  },
+  "stations": [],
+  "chargers": [],
+  "zones": [],
+  "markings": [],
+  "exterior_assets": []
+}
+```
+
+### Stations
+
+A station defines a semantic code, grid cell, service side, and type:
+
+```json
+{
+  "id": 0,
+  "code": "IN-01",
+  "cell": [3, 1],
+  "side": "north",
+  "station_type": "pickup"
+}
+```
+
+`side` is important. The runtime and renderer use it so the table fixture is placed near the correct edge while the service cell remains clear for the robot.
+
+### Semantic zones
+
+Zones let tasks refer to concepts such as `packing_area`, `rack_a`, or `dispatch_zone`. Storage zones resolve to real rack slots. Other zones resolve to a walkable service cell near the zone center.
+
+### Solid visual footprints
+
+If a rendered machine occupies floor cells, declare them as `W` in the layout and describe the same bounds in zone metadata:
+
+```json
+"metadata": {
+  "navigation_footprint": [15, 8, 20, 13]
+}
+```
+
+Multipart equipment can use:
+
+```json
+"metadata": {
+  "navigation_footprints": [
+    [11, 3, 12, 6],
+    [23, 3, 24, 6],
+    [13, 6, 22, 6]
+  ]
+}
+```
+
+The compiler fails if a declared solid footprint overlaps a walkable cell. This prevents the digital twin from showing robots driving through machinery.
+
+### Compiler checks
+
+`EnvironmentEngine` verifies:
+
+- schema validity and dimensions;
+- walkable connectivity;
+- graph diameter;
+- station accessibility;
+- rack-slot access;
+- charger accessibility and capacity;
+- robot spawn validity;
+- agreement between solid visual footprints and navigation.
+
+Compile a definition directly:
+
+```bash
+cd backend
+python -c "from environment_engine import EnvironmentEngine; _, report = EnvironmentEngine.compile_file('warehouses/warehouse_3.json'); print(report.summary()); raise SystemExit(0 if report.is_valid else 1)"
+```
+
+### Adding Warehouse #4 safely
+
+1. Copy an existing JSON definition.
+2. Give it a unique lowercase `id` and correct dimensions.
+3. Design the grid first; keep all required stations and chargers connected.
+4. Add semantic stations and zones.
+5. Mark every solid rendered footprint with `W` and footprint metadata.
+6. Set valid robot starts and enough charging pads.
+7. Compile the definition and fix every error.
+8. Add warehouse-specific topology tests, not warehouse-specific robot behavior.
+9. Add the warehouse to the `WAREHOUSES` selector in `frontend/src/dashboard/Controls.jsx`.
+10. Run the complete test suite and a full episode before committing.
+
+---
+
+## 9. Backend interfaces
+
+### REST endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/status` | Service health and version |
+| `GET` | `/api/warehouse` | Active compiled warehouse state |
+| `GET` | `/api/warehouses` | Available JSON definitions |
+| `POST` | `/api/warehouses/{id}/select` | Switch the active warehouse and reset the simulation |
+| `GET` | `/api/metrics` | Current metrics snapshot |
+| `GET` | `/docs` | FastAPI-generated API documentation |
+
+### WebSocket
+
+Connect to `/ws`. The server first sends an `init` frame, then `state_update` frames containing:
+
+- tick and simulation status;
+- robot state, path, battery, task and handling state;
+- warehouse grid, tables, slots, zones and barriers;
+- pending, active, completed, cancelled and failed tasks;
+- metrics, recent P2P messages and event log;
+- network partition state.
+
+### WebSocket commands
+
+Send JSON objects with an `action` field:
+
+| Action | Important fields | Purpose |
+| --- | --- | --- |
+| `start` | — | Reset and start the demonstration |
+| `pause` | — | Toggle pause/resume |
+| `speed` | `value` | Set speed from 0.1 to 4 |
+| `switch_warehouse` | `warehouse_id` | Load another definition |
+| `block_aisle` | optional `x`, `y` | Block a cell or auto-select a route cell |
+| `unblock_aisle` | `x`, `y` | Remove one barrier |
+| `clear_blocks` | — | Remove all temporary barriers |
+| `toggle_partition` | `robot_id` | Toggle simulated Wi-Fi loss |
+| `boost_battery` | `robot_id` | Set one robot to full charge |
+| `create_task` | `source`, `destination`, optional `priority`, `max_retries` | Insert a semantic task |
+| `cancel_task` | `task_id` | Cancel eligible work |
+| `reassign_task` | `task_id` | Return an uncollected assignment to auction |
+| `retry_task` | `task_id` | Retry eligible terminal work |
+| `update_task_destination` | `task_id`, `destination` | Change a pending destination |
+| `set_robot_available` | `robot_id`, `available`, optional `reason` | Remove/return a robot from service |
+| `run_baseline` | — | Start the built-in baseline comparison |
+
+Invalid commands return a `command_error` frame.
+
+---
+
+## 10. Repository structure
+
+```text
+Fleet-In-Motion/
+├── backend/
+│   ├── main.py                    FastAPI app, simulation loop, REST and WebSocket commands
+│   ├── robot.py                   Warehouse-independent autonomous robot agent
+│   ├── presentation_robot.py      Handling dwell used by the live digital twin
+│   ├── pathfinding.py             Local grid A*
+│   ├── p2p.py                     Simulated peer inboxes and network partitions
+│   ├── collision.py               Vertex/swap auditing and wait-for deadlock resolution
+│   ├── task_manager.py            Static manifest and dynamic task lifecycle
+│   ├── warehouse_schema.py        Pydantic warehouse definition models
+│   ├── environment_engine.py      Compiler, topology checks and diagnostics
+│   ├── warehouse.py               Runtime grid, semantics, slots, inventory and barriers
+│   ├── metrics.py / events.py     Telemetry collectors
+│   ├── baseline.py                Stop-and-wait comparison controller
+│   ├── smoke_demo.py              Headless putaway/charging invariant replay
+│   ├── warehouses/                Warehouse JSON definitions and JSON Schema
+│   └── test_*.py                  Backend and complete-episode regression tests
+├── frontend/
+│   ├── src/components/            Three.js scene, robots, warehouse, cargo and overlays
+│   ├── src/dashboard/             Controls, task queue, robot inspector, metrics and events
+│   ├── src/utils/                 Presentation math, state derivation and socket client
+│   ├── src/store.js               Zustand application state
+│   ├── src/websocket.js           Shared reconnecting WebSocket integration
+│   ├── package.json               Frontend scripts and dependencies
+│   └── vite.config.js             Vite/Tailwind setup and local WebSocket proxy
+├── PHASE5_WAREHOUSE3.md           WH3 topology, visual and validation record
+├── PHASE6_DYNAMIC_TASKS.md        Dynamic task behavior and limitations
+├── PUTAWAY_ROUND.md               Carton/storage workflow details
+├── BARRIER_NAVIGATION.md          Barrier and rerouting behavior
+├── CHANGES.md                     Development history and measured results
+├── Dockerfile                     Production multi-stage build
+└── render.yaml                    Render deployment definition
+```
+
+---
+
+## 11. Configuration
+
+Shared simulation defaults are in `backend/config.py`. Warehouse dimensions, starts, fleet size, target rack islands, and chargers should normally come from warehouse JSON.
+
+| Setting | Current default | Meaning |
+| --- | ---: | --- |
+| `TICK_RATE` | `10` | Simulation ticks per second |
+| `MAX_TICKS` | `2000` | Episode timeout |
+| `LOOKAHEAD_WINDOW` | `5` | Planned cells included in intent broadcasts |
+| `SENSOR_RANGE` | `5` | Simulated local occupancy sensing range |
+| `BATTERY_MAX` | `100` | Maximum charge |
+| `BATTERY_DRAIN_PER_MOVE` | `0.5` | Charge used per movement tick |
+| `BATTERY_DRAIN_IDLE` | `0.1` | Charge used per non-movement tick |
+| `BATTERY_LOW_THRESHOLD` | `50` | Charging detour threshold |
+| `BATTERY_CHARGE_PER_TICK` | `5` | Charge recovered on a pad |
+| `STORAGE_FLOW_ENABLED` | `True` | Use table-to-rack putaway for the web demonstration |
+| `END_OF_ROUND_CHARGE` | `True` | Park and charge after the mission |
+
+Change these carefully and rerun all tests. Benchmark results are only comparable when scenario and configuration are unchanged.
+
+---
+
+## 12. Testing and validation
+
+### Complete backend suite
+
+```bash
+cd backend
+python -m unittest discover -s . -p "test_*.py"
+```
+
+The suite covers warehouse compilation, WH1/WH2/WH3 topology, A* rack access, barriers, dynamic tasks, handling contracts, station orientation, collision invariants, and deterministic episodes.
+
+### Headless putaway and charging replay
+
+```bash
+cd backend
+python smoke_demo.py
+```
+
+This checks:
+
+- exactly one physical location per carton;
+- no duplicated or missing cargo;
+- tables empty once and do not refill;
+- stored cartons remain stored;
+- no collisions or charger double-booking;
+- all robots eventually park on distinct pads.
+
+### Coordination benchmark
 
 ```bash
 cd backend
 python test_simulation.py
 ```
 
-### 2. Presentation Handling Contract Tests
-Validates cargo ownership transfer, dwell ticks, and reset safety:
+The benchmark compares the decentralized fleet with stop-and-wait variants over deterministic episodes. It prints timeouts, same-cell conflicts, swap conflicts, completion time and sensitivity to backoff thresholds. Treat its exit status and full output as the result; do not copy only favorable numbers.
 
-```bash
-cd backend
-python -m unittest discover -p "test_presentation_contract.py" -v
-```
-
-### 3. Frontend Math & Motion Unit Tests
-Validates coordinate transforms, yaw wrapping, right-angle turns, and WebSocket handling:
+### Frontend tests and build
 
 ```bash
 cd frontend
+npm ci
 npm test
-```
-
-### 4. Frontend Production Build
-Validates bundle compilation and asset optimization:
-
-```bash
-cd frontend
 npm run build
 ```
 
----
+Frontend tests cover motion interpolation, heading conversion, cargo ownership, rack placement, station clearance, mission summaries, WebSocket behavior and alert presentation.
 
-## Project Structure
+### Minimum verification before merging
 
-```
-RobotSim/
-├── assets/
-│   └── banner.jpg                   # High-resolution README banner image
-├── backend/
-│   ├── baseline.py                  # Stop-and-wait baseline controller (naive & backoff)
-│   ├── collision.py                 # Vertex & swap collision detection, deadlock DFS cycle finder
-│   ├── config.py                    # Warehouse dimensions, tick rates, battery, sensor parameters
-│   ├── events.py                    # In-memory circular event logger for telemetry
-│   ├── main.py                      # FastAPI application, WebSocket dispatch, simulation loop
-│   ├── metrics.py                   # Real-time and cumulative benchmark metrics tracker
-│   ├── p2p.py                       # Simulated asynchronous P2P mesh network & network partitions
-│   ├── pathfinding.py               # Local grid A* search implementation
-│   ├── presentation_robot.py        # Robot subclass with handling dwell ticks for web demo
-│   ├── requirements.txt             # Backend Python dependencies (FastAPI, Uvicorn, WebSockets)
-│   ├── robot.py                     # Autonomous edge AMR agent logic (local state, negotiation, bids)
-│   ├── task_manager.py              # Manifest generator & decentralized contract net auction
-│   ├── test_presentation_contract.py # Unit tests for cargo transfer contract
-│   ├── test_simulation.py           # 100-episode headless benchmark and verification suite
-│   └── warehouse.py                 # Warehouse grid layout, walkability queries, occupancy map
-├── frontend/
-│   ├── index.html                   # HTML entry point with WebGL viewport
-│   ├── package.json                 # Frontend dependencies and test scripts
-│   ├── vite.config.js               # Vite bundler configuration
-│   └── src/
-│       ├── App.jsx                  # Main application shell and layout
-│       ├── main.jsx                 # React root mounting
-│       ├── store.js                 # Zustand central telemetry and UI state store
-│       ├── websocket.js             # Resilient WebSocket connection manager
-│       ├── components/
-│       │   ├── BlockedAisle.jsx     # 3D interactive hazard barriers & placement tool
-│       │   ├── CameraController.jsx # Camera preset animations (Overview, Follow, Bays)
-│       │   ├── CargoBox.jsx         # Procedural package geometry with local canvas labels
-│       │   ├── P2PLines.jsx         # Live 3D P2P radio transmission rays
-│       │   ├── PathTrail.jsx        # Planned path breadcrumb ribbons
-│       │   ├── Robot.jsx            # Articulated humanoid AMR 3D model & IK gait
-│       │   ├── Robots.jsx           # Fleet collection renderer
-│       │   ├── Scene.jsx            # Three.js Canvas, lighting, shadows, and environment
-│       │   ├── Signage.jsx          # 3D hanging bay signs and status indicators
-│       │   └── Warehouse.jsx        # Instanced racks, floor markings, tables, chargers
-│       ├── dashboard/
-│       │   ├── Controls.jsx         # Simulation controls, speed, drills, camera presets
-│       │   ├── Dashboard.jsx        # Sidebar container and layout
-│       │   ├── EventLog.jsx         # Real-time chronological event feed
-│       │   ├── MetricsPanel.jsx     # Live performance and comparison metrics
-│       │   ├── RobotStatus.jsx      # Individual fleet unit telemetry cards
-│       │   └── TaskQueue.jsx        # Staged, active, and delivered task lists
-│       └── utils/
-│           ├── presentation.js      # Kinematics, heading math, and motion interpolation
-│           ├── simulationState.js   # Cargo lifecycle and mission summary helpers
-│           └── socketClient.js      # Pure WebSocket protocol client
-└── README.md                        # Project documentation
+```bash
+cd backend
+python -m unittest discover -s . -p "test_*.py"
+python smoke_demo.py
+
+cd ../frontend
+npm test
+npm run build
 ```
 
----
-
-## Configuration & Tuning
-
-Key simulation and physical parameters can be customized in [`backend/config.py`](./backend/config.py):
-
-| Constant | Default | Description |
-| :--- | :---: | :--- |
-| `GRID_WIDTH`, `GRID_HEIGHT` | `20, 20` | Warehouse dimensions ($20\text{ m} \times 20\text{ m}$) |
-| `NUM_ROBOTS` | `3` | Active autonomous mobile robots in the fleet |
-| `ROBOT_NAMES` | `["Farhan", "Debojyoti", "Gaurav"]` | Human-readable identity names for units |
-| `TICK_RATE` | `10` | Simulation frequency ($10\text{ Hz} = 0.1\text{s}$ per tick) |
-| `SENSOR_RANGE` | `5` | Onboard LiDAR proximity sensing radius in cells |
-| `LOOKAHEAD_WINDOW` | `5` | Trajectory steps broadcasted in intent packets |
-| `REPLAN_AFTER_WAITS` | `3` | Consecutive wait ticks before forcing an onboard A* reroute |
-| `BATTERY_MAX` | `100.0` | Maximum unit battery capacity |
-| `BATTERY_DRAIN_PER_MOVE` | `0.5` | Battery drain per cell movement |
-| `BATTERY_LOW_THRESHOLD`| `20.0` | Threshold triggering autonomous detour to charging pad |
+For geometry changes, also run the application and inspect every camera mode during a complete episode. A passing navigation test does not by itself prove that rendered geometry is correctly aligned.
 
 ---
 
-## Technology Stack
+## 13. Safe extension patterns
 
-* **Backend Engine**: [FastAPI](https://fastapi.tiangolo.com/), [Uvicorn](https://www.uvicorn.org/), [WebSockets](https://websockets.readthedocs.io/), Python `asyncio`
-* **Algorithms**: Decentralized Multi-Agent A*, Contract Net Protocol (Bid Auction), DFS Cycle Detection, Lookahead Intent Exchange
-* **Frontend Digital Twin**: [React 18](https://react.dev/), [React Three Fiber (R3F)](https://docs.pmnd.rs/react-three-fiber), [Three.js](https://threejs.org/), [@react-three/drei](https://github.com/pmndrs/drei)
-* **UI & Telemetry**: [Tailwind CSS v4](https://tailwindcss.com/), [Zustand](https://github.com/pmndrs/zustand), [Recharts](https://recharts.org/)
-* **Build Tooling**: [Vite](https://vitejs.dev/)
+### Add a robot coordination rule
+
+1. Confirm the behavior belongs to every warehouse.
+2. Add it to `robot.py` or a shared helper, never to warehouse JSON.
+3. Base decisions on runtime interfaces such as `is_walkable`, semantic endpoints, occupancy and P2P state.
+4. Add deterministic tests for both the desired behavior and collision invariants.
+5. Run episodes in all three warehouses.
+
+### Add a new task type
+
+1. Represent source and destination using semantic station/zone IDs.
+2. Resolve them through `Warehouse.resolve_semantic_location`.
+3. Preserve carton ownership and rack reservation rules.
+4. Extend `Task.as_payload` and `_serialize` only with warehouse-independent fields.
+5. Add lifecycle tests for cancellation, reassignment, retry and robot availability.
+
+### Add a visual machine
+
+1. Add semantic metadata to the warehouse definition.
+2. Mark its occupied grid cells as `W` or `#`.
+3. Declare `navigation_footprint` or `navigation_footprints`.
+4. Derive rendering position and size from those bounds.
+5. Add compiler and complete-route tests.
+6. Inspect the rendered model at ground level; do not rely only on overview screenshots.
+
+### Preserve benchmark history
+
+Do not overwrite old results. Record:
+
+- commit hash;
+- warehouse and configuration;
+- seed or deterministic scenario;
+- completion/timeouts;
+- collision and deadlock counters;
+- any changed assumptions.
 
 ---
 
-## License & Acknowledgments
+## 14. Docker deployment
 
-This project is licensed under the [MIT License](LICENSE).
+Build and run the combined frontend/backend image:
 
-Developed for **Smart India Hackathon (SIH 26123)** — *Autonomous Fleet Coordination in Modern Warehouses*.
-Special thanks to the open-source communities behind Three.js, React Three Fiber, and FastAPI.
+```bash
+docker build -t fleet-in-motion .
+docker run --rm -p 8000:8000 fleet-in-motion
+```
 
+Open `http://localhost:8000`. The Docker build compiles the frontend and lets FastAPI serve the generated static assets and WebSocket endpoint from the same origin.
+
+`render.yaml` contains a Render deployment definition with `/api/status` as the health check.
 
 ---
 
-## Phase 5: Warehouse #3 — Automated Cross-Dock & ASRS Campus
+## 15. Known limitations
 
-Warehouse #3 is a 36×24 blueprint-inspired automated campus with opposing inbound/outbound
-docks, west storage banks, a central ASRS core and ring corridors, sortation, a central charging
-court, east fulfillment cells, maintenance, dispatch buffering, and reverse logistics. It is loaded
-through the same warehouse compiler and uses the same robot intelligence as Warehouses #1 and #2.
+- Coordination is simulated in one Python process; P2P inboxes model direct communication but are not separate physical edge computers.
+- Movement is a discrete 2D grid model; the 3D scene interpolates between cells for presentation.
+- Local sensing uses simulated occupancy, not real LiDAR data.
+- Dynamic obstacles are operator-created grid barriers, not perception-generated obstacles.
+- Robot dynamics, acceleration, wheel slip, localization error and payload mass are not modeled.
+- A robot carrying cargo cannot currently be forcibly failed and reassigned without defining a physical handoff/recovery policy.
+- The frontend warehouse selector is currently a small explicit list and must be updated when adding another JSON definition.
+- Large-fleet scaling claims have not yet been validated.
+- ROS2, Nav2 and physical AMR adapters are future work.
 
-Select **WH #3 · ASRS Campus 36×24** under **Facility Topology** in the dashboard. The measured
-Phase 5 topology and deterministic simulation baseline are preserved in
-[`PHASE5_WAREHOUSE3.md`](PHASE5_WAREHOUSE3.md).
+These limitations are intentional and should remain explicit in demos, reports and future contributions.
 
-WH3 also enforces a compiler-validated physical-clearance contract: every custom solid machine or
-fixture is blocked in the navigation grid, including multipart conveyor footprints. The validation
-report records the original baseline and the later full-scene clearance correction separately.
+---
 
-## Phase 6: Dynamic semantic tasks
+## 16. Roadmap
 
-The existing fleet auction now accepts runtime missions expressed as warehouse station or zone
-names rather than UI coordinates. Use **Task queue → Insert semantic task** to choose a source,
-destination, and priority while a demonstration is running. Pending work can change destination;
-uncollected work can be cancelled, retried, or returned to the auction; and idle/pre-pickup robots
-can be marked unavailable without losing their task.
+The planned direction after the current warehouse and dynamic-task foundation is:
 
-The lifecycle, inventory guarantees, current limitations, and verification commands are recorded
-in [`PHASE6_DYNAMIC_TASKS.md`](PHASE6_DYNAMIC_TASKS.md).
+1. reproducible robot/network/station failure scenarios;
+2. configurable fleet-size scalability tests;
+3. automated warehouse × fleet × task × failure benchmarks;
+4. richer operational inspection and replay in the digital twin;
+5. validated external warehouse import/conversion;
+6. simulation and ROS2 robot-adapter interfaces;
+7. simulation-to-real architecture and final cross-scenario validation.
+
+Each capability should be described as implemented only after code, tests, measured results, documentation, and a committed checkpoint exist.
+
+---
+
+## 17. Contributing
+
+Before changing code:
+
+1. inspect the current implementation and existing tests;
+2. check `git status` and preserve unrelated work;
+3. identify whether the change belongs to warehouse data, environment logic, robot intelligence, task lifecycle, server orchestration, or presentation;
+4. make the smallest reusable change;
+5. add regression coverage;
+6. run backend tests, frontend tests, a production build, and a complete relevant simulation;
+7. document changed behavior and known limitations;
+8. commit with a focused message; do not force-push shared branches.
+
+Useful commit prefixes:
+
+- `fix:` bug correction;
+- `feat:` implemented capability;
+- `test:` test-only work;
+- `docs:` documentation-only work;
+- `refactor:` behavior-preserving restructuring.
+
+---
+
+## 18. Technology stack
+
+- **Backend:** Python, FastAPI, asyncio, Uvicorn, WebSockets, Pydantic
+- **Simulation:** local A*, contract-net-style bidding, P2P intent exchange, DFS wait-for deadlock detection
+- **Frontend:** React 18, Three.js, React Three Fiber, Drei, Zustand, Recharts, Tailwind CSS
+- **Build and deployment:** Vite, npm, Docker, Render
+
+---
+
+## 19. Project origin
+
+Fleet in Motion was developed for **Smart India Hackathon problem statement SIH26123** as an exploration of decentralized AMR fleet coordination and warehouse digital twins.
+
+The repository should be evaluated as an evolving simulation platform: implemented behavior is covered by code and tests, while hardware integration and industrial deployment remain future engineering work.
