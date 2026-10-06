@@ -16,6 +16,11 @@ import {
 } from './SmartWarehouseElements'
 import { sendCommand } from '../websocket'
 import { mapCargoLifecycle } from '../utils/simulationState.js'
+import {
+  RACK_DECK_LEVELS,
+  RACK_DECK_THICKNESS,
+  rackSlotWorldPosition,
+} from '../utils/presentation.js'
 function Batch({ items, color, opacity = 1 }) {
   const ref = useRef()
   useLayoutEffect(() => {
@@ -160,31 +165,38 @@ export default function Warehouse() {
   const placeMode = useStore((s) => s.placeMode)
   const sim = useStore((s) => s.sim)
   const low = shelfView === 'lowRack'
-  // The deck the fleet actually stores on: the ground deck in low-rack view,
-  // the middle deck otherwise. Live inventory and the robot's reach agree.
-  const storeLevel = low ? 0.24 : 1.0
   const liveSlots = useMemo(() => (warehouse?.racks || []).filter((slot) => slot.state !== 'empty'), [warehouse])
   const batches = useMemo(() => {
     const result = { posts: [], rails: [], decks: [], boxes: [], tape: [], walls: [], lanes: [] }
     if (!warehouse?.grid) return result
     const { grid, width, height } = warehouse
     const add = (list, at, size) => result[list].push({ at, size })
-    // The racks start almost empty on purpose. Only the top deck keeps a little
-    // legacy stock for depth; the deck the fleet stores on is bare, so every
-    // carton a judge sees on a shelf was put there by a robot on screen.
-    const decorLevel = low ? null : 1.76
+    // Build rack geometry from the same addressable shelf cells used by the
+    // backend. Warehouse #2 contains 2x3 and irregular rack footprints, so a
+    // visual-only 2x2 assumption left valid lower-row slots without a deck.
+    const deckLevels = low ? RACK_DECK_LEVELS.lowRack : RACK_DECK_LEVELS.standard
+    const decorLevel = low ? null : deckLevels.at(-1)
+    const postKeys = new Set()
+    const addPost = (x, z, h) => {
+      const key = `${x}:${z}`
+      if (postKeys.has(key)) return
+      postKeys.add(key)
+      add('posts', [x, h / 2, z], [0.075, h, 0.075])
+    }
     for (let z = 0; z < height; z++) for (let x = 0; x < width; x++) {
       const cell = grid[z][x]
-      if (cell === 1 && grid[z - 1]?.[x] !== 1 && grid[z]?.[x - 1] !== 1) {
-        const cx = x + 1, cz = z + 1, h = low ? 0.76 : 2.15
-        for (const dx of [-0.85, 0.85]) for (const dz of [-0.85, 0.85]) add('posts', [cx + dx, h / 2, cz + dz], [0.075, h, 0.075])
-        for (const level of (low ? [0.24] : [0.24, 1.0, 1.76])) {
-          add('decks', [cx, level, cz], [1.76, 0.035, 1.76])
-          for (const dz of [-0.85, 0.85]) add('rails', [cx, level, cz + dz], [1.8, 0.09, 0.065])
-          if (level !== decorLevel) continue
-          for (const dx of [-0.43, 0.43]) {
-            add('boxes', [cx + dx, level + 0.23, cz - 0.42], [0.58, 0.43, 0.60])
-            add('tape', [cx + dx, level + 0.448, cz - 0.42], [0.07, 0.008, 0.61])
+      if (cell === 1) {
+        const cx = x + 0.5, cz = z + 0.5, h = low ? 0.76 : 2.15
+        for (const px of [x + 0.06, x + 0.94]) for (const pz of [z + 0.06, z + 0.94]) addPost(px, pz, h)
+        for (const level of deckLevels) {
+          add('decks', [cx, level, cz], [0.88, RACK_DECK_THICKNESS, 0.88])
+          if (grid[z - 1]?.[x] !== 1) add('rails', [cx, level, z + 0.06], [0.92, 0.09, 0.065])
+          if (grid[z + 1]?.[x] !== 1) add('rails', [cx, level, z + 0.94], [0.92, 0.09, 0.065])
+          if (grid[z]?.[x - 1] !== 1) add('rails', [x + 0.06, level, cz], [0.065, 0.09, 0.92])
+          if (grid[z]?.[x + 1] !== 1) add('rails', [x + 0.94, level, cz], [0.065, 0.09, 0.92])
+          if (level === decorLevel && (x + z) % 2 === 0) {
+            add('boxes', [cx, level + 0.23, cz], [0.58, 0.43, 0.60])
+            add('tape', [cx, level + 0.448, cz], [0.07, 0.008, 0.61])
           }
         }
       }
@@ -212,20 +224,21 @@ export default function Warehouse() {
   const exteriorAssets = warehouse.exterior_assets || []
   const markings = warehouse.markings || []
   const hasZones = zones.length > 0
+  const enhancedEnvironment = hasZones || exteriorAssets.length > 0
 
   return <group>
     {/* Interior clean light-gray concrete warehouse floor */}
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.005, height / 2]} receiveShadow>
-      <planeGeometry args={[width + 1.2, height + 1.2]} />
-      <meshStandardMaterial color="#e2e8f0" roughness={0.65} metalness={0.08} />
+      <planeGeometry args={[width + (enhancedEnvironment ? 1.2 : 0.8), height + (enhancedEnvironment ? 1.2 : 0.8)]} />
+      <meshStandardMaterial color={enhancedEnvironment ? '#e2e8f0' : '#d5dbd8'} roughness={enhancedEnvironment ? 0.65 : 0.86} metalness={enhancedEnvironment ? 0.08 : 0} />
     </mesh>
     {/* Exterior logistics asphalt apron outside south dock doors for freight trucks */}
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.007, height + 1.8]} receiveShadow>
+    {exteriorAssets.length > 0 && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.007, height + 1.8]} receiveShadow>
       <planeGeometry args={[width + 3.0, 3.8]} />
       <meshStandardMaterial color="#64748b" roughness={0.88} />
-    </mesh>
+    </mesh>}
     {/* Subtle expansion joints on concrete floor */}
-    <gridHelper args={[gridDimension, gridDimension, '#cbd5e1', '#e2e8f0']} position={[width / 2, 0.001, height / 2]} />
+    <gridHelper args={enhancedEnvironment ? [gridDimension, gridDimension, '#cbd5e1', '#e2e8f0'] : [20, 20, '#aebbb9', '#c0cbc7']} position={[width / 2, 0.001, height / 2]} />
     {/* Clean off-white / light industrial wall panels */}
     <Batch items={batches.walls} color="#cbd5e1" />
     {/* High-detail pallet racks: royal industrial blue uprights, safety orange crossbeams */}
@@ -303,7 +316,7 @@ export default function Warehouse() {
         stored slot turns green and carries the real package until it is picked. */}
     {liveSlots.map((slot) => <group key={slot.id}>
       <mesh position={[slot.access[0] + 0.5, 0.014, slot.access[1] + 0.5]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color={slot.state === 'stored' ? '#297359' : '#b8862c'} transparent opacity={0.22} depthWrite={false} /></mesh>
-      {slot.state === 'stored' && cargo.storedCargo.some((item) => item.taskId === slot.task_id) && <CargoBox taskId={slot.task_id} position={[slot.cell[0] + 0.5, storeLevel + 0.16, slot.cell[1] + 0.5]} />}
+      {slot.state === 'stored' && cargo.storedCargo.some((item) => item.taskId === slot.task_id) && <CargoBox taskId={slot.task_id} position={rackSlotWorldPosition(slot, shelfView)} />}
     </group>)}
     {(warehouse.tables || []).map((table) => <Station key={table.code} table={table} handling={handling} staged={cargo.tableCargo.find((item) => item.cell[0] === table.cell[0] && item.cell[1] === table.cell[1])} />)}
     {(warehouse.chargers || []).map(([x, z], i) => <ChargerPad key={`c${i}`} cell={[x, z]} index={i} occupant={padOccupant(x, z)} claimant={padClaimant(x, z)} />)}

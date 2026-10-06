@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { RIG, CARRY, STATION, headingToYaw, angleDelta, createMotion, queueMotion, advanceMotion, transferPose, chooseFollowRobot } from './presentation.js'
+import { RIG, CARRY, STATION, CARTON_SIZE, RACK_DECK_LEVELS, RACK_DECK_THICKNESS, rackCartonCenterY, rackSlotWorldPosition, headingToYaw, angleDelta, createMotion, queueMotion, advanceMotion, transferPose, chooseFollowRobot } from './presentation.js'
 import { getRobotStatusMeta, mapCargoLifecycle, getRobotNextDestination } from './simulationState.js'
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`)
 test('rig chest is below head and above hips in a single coordinate space', () => {
@@ -41,6 +41,19 @@ test('pickup and dropoff positions meet the same station and hand endpoints', ()
   assert.deepEqual(transferPose({ kind: 'pickup', progress: 1 }).position, [...CARRY])
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 0 }).position, [...CARRY])
   assert.deepEqual(transferPose({ kind: 'dropoff', progress: 1 }).position, [...STATION])
+})
+test('rack-slot placement rests every carton on the selected deck', () => {
+  const slots = [
+    { cell: [3, 3], island: 'Rack A' },
+    { cell: [20, 3], island: 'Rack B' },
+    { cell: [3, 12], island: 'Rack C' },
+    { cell: [25, 12], island: 'Rack D' },
+  ]
+  const expectedY = RACK_DECK_LEVELS.lowRack[0] + RACK_DECK_THICKNESS / 2 + CARTON_SIZE[1] / 2
+  near(rackCartonCenterY('lowRack'), expectedY)
+  for (const slot of slots) {
+    assert.deepEqual(rackSlotWorldPosition(slot, 'lowRack'), [slot.cell[0] + 0.5, expectedY, slot.cell[1] + 0.5])
+  }
 })
 test('follow respects current selection, and handles an empty fleet', () => {
   const robots = [{ id: 1 }, { id: 2 }]

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { CanvasTexture, SRGBColorSpace } from 'three'
+import { CARTON_SIZE } from '../utils/presentation.js'
 // Centered carton: every lifecycle stage uses the same physical dimensions.
 export default function CargoBox({ taskId, position = [0, 0, 0], scale = 1, rotation = [0, 0, 0] }) {
   const label = useMemo(() => {
@@ -16,9 +17,9 @@ export default function CargoBox({ taskId, position = [0, 0, 0], scale = 1, rota
   }, [taskId])
   useEffect(() => () => label.dispose(), [label])
   return <group position={position} rotation={rotation} scale={scale}>
-    <mesh castShadow><boxGeometry args={[0.36, 0.28, 0.30]} /><meshStandardMaterial color="#c9965f" roughness={0.85} /></mesh>
-    <mesh position={[0, 0.141, 0]}><boxGeometry args={[0.07, 0.004, 0.302]} /><meshStandardMaterial color="#a7743f" roughness={0.65} /></mesh>
-    <mesh position={[0, 0, 0.151]}><planeGeometry args={[0.27, 0.17]} /><meshBasicMaterial map={label} /></mesh>
-    <mesh position={[0.181, 0, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[0.24, 0.15]} /><meshBasicMaterial map={label} /></mesh>
+    <mesh castShadow><boxGeometry args={CARTON_SIZE} /><meshStandardMaterial color="#c9965f" roughness={0.85} /></mesh>
+    <mesh position={[0, CARTON_SIZE[1] / 2 + 0.001, 0]}><boxGeometry args={[0.07, 0.004, CARTON_SIZE[2] + 0.002]} /><meshStandardMaterial color="#a7743f" roughness={0.65} /></mesh>
+    <mesh position={[0, 0, CARTON_SIZE[2] / 2 + 0.001]}><planeGeometry args={[0.27, 0.17]} /><meshBasicMaterial map={label} /></mesh>
+    <mesh position={[CARTON_SIZE[0] / 2 + 0.001, 0, 0]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[0.24, 0.15]} /><meshBasicMaterial map={label} /></mesh>
   </group>
 }

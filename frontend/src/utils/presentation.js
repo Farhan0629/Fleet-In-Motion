@@ -2,10 +2,27 @@
 export const RIG = Object.freeze({ hip: 0.83, chest: 1.15, shoulder: 1.34, head: 1.59, upperLeg: 0.34, lowerLeg: 0.36 })
 export const CARRY = Object.freeze([0, 1.04, 0.35])
 export const STATION = Object.freeze([0, 0.91, 0.40])
+export const CARTON_SIZE = Object.freeze([0.36, 0.28, 0.30])
+export const RACK_DECK_THICKNESS = 0.035
+export const RACK_DECK_LEVELS = Object.freeze({
+  lowRack: Object.freeze([0.24]),
+  standard: Object.freeze([0.24, 1.0, 1.76]),
+})
+export const rackStoreLevel = (shelfView = 'lowRack') => (
+  shelfView === 'lowRack' ? RACK_DECK_LEVELS.lowRack[0] : RACK_DECK_LEVELS.standard[1]
+)
+export const rackCartonCenterY = (shelfView = 'lowRack') => (
+  rackStoreLevel(shelfView) + RACK_DECK_THICKNESS / 2 + CARTON_SIZE[1] / 2
+)
+export const rackSlotWorldPosition = (slot, shelfView = 'lowRack') => [
+  slot.cell[0] + 0.5,
+  rackCartonCenterY(shelfView),
+  slot.cell[1] + 0.5,
+]
 // Rack transfers do not happen at table height: the lower deck sits near the
 // floor and the upper deck at chest height, so the hands have to meet the shelf.
-export const RACK_STATION_LOW = Object.freeze([0, 0.46, 0.44])
-export const RACK_STATION_HIGH = Object.freeze([0, 1.20, 0.44])
+export const RACK_STATION_LOW = Object.freeze([0, rackCartonCenterY('lowRack'), 0.44])
+export const RACK_STATION_HIGH = Object.freeze([0, rackCartonCenterY('standard'), 0.44])
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 export const smooth = (v) => { const t = clamp(v); return t * t * (3 - 2 * t) }
 // Model faces +Z; backend heading 0 means +X.
