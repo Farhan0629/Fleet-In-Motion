@@ -213,3 +213,18 @@ Preserved station service-side metadata in the runtime warehouse and moved table
 their robot service cells. North/south/east/west tables now orient consistently, and handling
 animation faces the real fixture side. This prevents robots from visually walking through tables
 without changing A*, task allocation, or warehouse-specific robot behavior.
+
+
+## Phase 6 rebuild — Dynamic rack consolidation
+
+Replaced generic task insertion, retry and destination-editing controls/API with
+explicit warehouse inventory preparation and Fill Empty Rack. Added declarative
+target/capacity/carton fixtures to all three warehouses, deterministic feasible
+A* relocation selection, stable cargo IDs, claim-safe cancellation/failure and
+live mission telemetry. Reused existing queue, bidding, P2P coordination and rack
+handling/placement. Core robot intelligence and Phase 1–5 behavior are unchanged.
+
+Consolidation and inventory-conservation tests pass on WH1 (4 slots), WH2 (6) and
+WH3 (8), with zero collisions/deadlocks. WebSocket tests also exercise default
+batteries, fleet parking and the original putaway start command. Frontend tests
+and production build pass. See PHASE6_DYNAMIC_TASKS.md. No Phase 7 work included.

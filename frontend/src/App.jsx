@@ -17,6 +17,7 @@ export default function App() {
   const connectionError = useStore((s) => s.connectionError)
   const setReduced = useStore((s) => s.setReducedMotion)
   const sim = useStore((s) => s.sim)
+  const consolidation = useStore((s) => s.tasks.consolidation?.enabled)
   const [help, setHelp] = useState(true)
   useEffect(() => connectWebSocket(), [])
   useEffect(() => {
@@ -34,10 +35,10 @@ export default function App() {
       <section className="demo-viewport relative" aria-label="Interactive warehouse digital twin">
         <SceneBoundary><Scene /></SceneBoundary>
         <RobotPovOverlay />
-        {help && <div className="watch-guide"><div><strong>Watch a carton move</strong><p>All twelve tables start with one carton; the racks start empty. Select a unit, choose Follow, and watch it lift the carton off a table, carry it and slide it into its reserved rack slot — the table stays empty afterwards. When the last carton is stored, the fleet books charge pads over the mesh and docks. Press "Force high battery" to instantly max out a unit's charge.</p></div><button aria-label="Dismiss viewing guide" onClick={() => setHelp(false)}>×</button></div>}
+        {help && <div className="watch-guide"><div><strong>{consolidation ? 'Watch rack consolidation' : 'Watch a carton move'}</strong><p>{consolidation ? 'Existing cartons start in occupied racks, with one designated target kept empty. Fill Empty Rack generates feasible relocation tasks from live inventory. Follow a robot as it lifts its assigned carton from the source shelf, carries it, and places it into the reserved target slot. The source stays empty and the target holds that same carton.' : 'All twelve tables start with one carton; the racks start empty. Select a unit, choose Follow, and watch it lift the carton off a table, carry it and slide it into its reserved rack slot — the table stays empty afterwards. When the last carton is stored, the fleet books charge pads over the mesh and docks. Press "Force high battery" to instantly max out a unit\'s charge.'}</p></div><button aria-label="Dismiss viewing guide" onClick={() => setHelp(false)}>×</button></div>}
         {connectionError && connected && <div className="connection-notice" role="status">{connectionError}</div>}
         {!connected && <div className="connection-notice" role="status">{connectionError || 'Waiting for the simulation server on port 8000. No live values are fabricated.'}</div>}
-        <div className="viewport-caption"><span>RECEIVE → PUTAWAY → STORE · then DOCK → CHARGE</span><span>Drag to orbit · Scroll to zoom</span></div>
+        <div className="viewport-caption"><span>{consolidation ? 'INVENTORY → AUCTION → PICKUP → TRANSPORT → PLACEMENT' : 'RECEIVE → PUTAWAY → STORE · then DOCK → CHARGE'}</span><span>Drag to orbit · Scroll to zoom</span></div>
       </section>
       <aside className="demo-dashboard" aria-label="Fleet controls and telemetry"><Dashboard /></aside>
     </main>

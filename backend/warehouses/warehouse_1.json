@@ -84,7 +84,141 @@
         7,
         18
       ]
-    ]
+    ],
+    "consolidation": {
+      "target_rack": "A1",
+      "capacity": 4,
+      "initial_inventory": [
+        {
+          "slot": "A2-01",
+          "cargo_id": "C005"
+        },
+        {
+          "slot": "A2-02",
+          "cargo_id": "C006"
+        },
+        {
+          "slot": "A2-03",
+          "cargo_id": "C007"
+        },
+        {
+          "slot": "A2-04",
+          "cargo_id": "C008"
+        },
+        {
+          "slot": "A3-01",
+          "cargo_id": "C009"
+        },
+        {
+          "slot": "A3-02",
+          "cargo_id": "C010"
+        },
+        {
+          "slot": "A3-03",
+          "cargo_id": "C011"
+        },
+        {
+          "slot": "A3-04",
+          "cargo_id": "C012"
+        },
+        {
+          "slot": "B1-01",
+          "cargo_id": "C013"
+        },
+        {
+          "slot": "B1-02",
+          "cargo_id": "C014"
+        },
+        {
+          "slot": "B1-03",
+          "cargo_id": "C015"
+        },
+        {
+          "slot": "B1-04",
+          "cargo_id": "C016"
+        },
+        {
+          "slot": "B2-01",
+          "cargo_id": "C017"
+        },
+        {
+          "slot": "B2-02",
+          "cargo_id": "C018"
+        },
+        {
+          "slot": "B2-03",
+          "cargo_id": "C019"
+        },
+        {
+          "slot": "B2-04",
+          "cargo_id": "C020"
+        },
+        {
+          "slot": "B3-01",
+          "cargo_id": "C021"
+        },
+        {
+          "slot": "B3-02",
+          "cargo_id": "C022"
+        },
+        {
+          "slot": "B3-03",
+          "cargo_id": "C023"
+        },
+        {
+          "slot": "B3-04",
+          "cargo_id": "C024"
+        },
+        {
+          "slot": "C1-01",
+          "cargo_id": "C025"
+        },
+        {
+          "slot": "C1-02",
+          "cargo_id": "C026"
+        },
+        {
+          "slot": "C1-03",
+          "cargo_id": "C027"
+        },
+        {
+          "slot": "C1-04",
+          "cargo_id": "C028"
+        },
+        {
+          "slot": "C2-01",
+          "cargo_id": "C029"
+        },
+        {
+          "slot": "C2-02",
+          "cargo_id": "C030"
+        },
+        {
+          "slot": "C2-03",
+          "cargo_id": "C031"
+        },
+        {
+          "slot": "C2-04",
+          "cargo_id": "C032"
+        },
+        {
+          "slot": "C3-01",
+          "cargo_id": "C033"
+        },
+        {
+          "slot": "C3-02",
+          "cargo_id": "C034"
+        },
+        {
+          "slot": "C3-03",
+          "cargo_id": "C035"
+        },
+        {
+          "slot": "C3-04",
+          "cargo_id": "C036"
+        }
+      ]
+    }
   },
   "stations": [
     {

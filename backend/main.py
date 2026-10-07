@@ -1,4 +1,8 @@
-"""FastAPI/WebSocket simulation server. Web demos include handling dwell;
+"""FastAPI/WebSocket simulation server. Phase 6 adds inventory-driven rack
+consolidation via explicit prepare_consolidation / fill_empty_rack commands.
+The original start command and putaway flow described below remain unchanged.
+
+Web demos include handling dwell;
 headless benchmark continues to import the original robot.Robot directly.
 
 The demonstration floor is a receiving round with a fully staged manifest:
@@ -189,6 +193,7 @@ async def broadcast_state(state):
 
 async def simulation_loop():
     round_reported = {"stored": False}
+    episode_start = sim_state["tick"]
     while sim_state["running"]:
         if sim_state["paused"]:
             await asyncio.sleep(0.1)
@@ -196,6 +201,11 @@ async def simulation_loop():
         sim_state["tick"] += 1
         tick = sim_state["tick"]
         metrics.episode_ticks = tick
+        task_manager.consolidation.refresh(robots, tick)
+        if task_manager.consolidation.status == "blocked":
+            sim_state["paused"] = True
+            await broadcast_state(build_state_message(tick))
+            continue
         task_manager.allocate_tasks(robots, p2p_network, event_logger, tick)
         for robot in robots:
             action = robot.tick(tick, p2p_network, event_logger)
@@ -205,7 +215,7 @@ async def simulation_loop():
                 # started, and this call is a no-op if so.
                 task_manager.note_pickup(leg["id"])
                 source = (
-                    f"rack slot {leg.get('slot_code')}" if leg.get("pickup_kind") == "rack"
+                    f"rack slot {leg.get('pickup_slot_code') or leg.get('slot_code')}" if leg.get("pickup_kind") == "rack"
                     else f"table {leg.get('table_code') or ''} ({robot.x},{robot.y})".replace("  ", " ")
                 )
                 event_logger.add_event("pickup", f"{robot.name} secured package #{leg['id']} from {source}", robot_id=robot.id, tick=tick)
@@ -238,11 +248,16 @@ async def simulation_loop():
                 event_logger.add_event("yield", f"{robot.name} yielding at ({robot.x},{robot.y})", robot_id=robot.id, tick=tick)
         for _ in detect_collisions(robots):
             metrics.record_collision()
+            if task_manager.consolidation.enabled and task_manager.consolidation.status != "completed":
+                task_manager.consolidation.collisions += 1
         deadlocks = detect_deadlock(robots)
         if deadlocks:
+            if task_manager.consolidation.enabled and task_manager.consolidation.status != "completed":
+                task_manager.consolidation.deadlocks += len(deadlocks)
             resolve_deadlock(robots, deadlocks, warehouse, p2p_network, tick)
         # The round is finished when every staged carton is on a shelf. The
         # fleet then takes itself home: book a pad, dock, charge, park.
+        task_manager.consolidation.refresh(robots, tick)
         round_done = task_manager.is_mission_complete()
         mission_size = len(task_manager.all_tasks)
         if round_done and END_OF_ROUND_CHARGE:
@@ -252,8 +267,10 @@ async def simulation_loop():
             for robot in robots:
                 robot.park_for_charging(p2p_network, tick, event_logger)
         fleet_parked = all(getattr(robot, "parked", False) for robot in robots) if END_OF_ROUND_CHARGE else True
-        if (round_done and fleet_parked) or tick >= MAX_TICKS:
+        if (round_done and fleet_parked) or tick - episode_start >= MAX_TICKS:
             sim_state["running"] = False
+            if not round_done:
+                task_manager.consolidation.timeout()
             if round_done:
                 stored = metrics.packages_stored
                 charges = metrics.charge_cycles
@@ -406,20 +423,36 @@ async def websocket_endpoint(ws: WebSocket):
                     robot.battery = float(BATTERY_MAX)
                     event_logger.add_event("charging", f"Boost: {robot.name} state of charge set to {robot.battery:.0f}%", robot_id=robot.id, tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
-                elif action == "create_task":
-                    task = task_manager.create_dynamic_task(
-                        command.get("source"),
-                        command.get("destination"),
-                        priority=int(command.get("priority", 3)),
-                        tick=sim_state["tick"],
-                        max_retries=int(command.get("max_retries", 2)),
-                    )
-                    event_logger.add_event(
-                        "system",
-                        f"Dynamic task #{task.id} queued: {task.source_label} → {task.destination_label} (priority {task.priority})",
-                        tick=sim_state["tick"],
-                    )
+                elif action == "prepare_consolidation":
+                    if sim_state["running"] or baseline_running:
+                        raise ValueError("Stop the current demonstration before preparing consolidation")
+                    task_manager.consolidation.prepare()
+                    for i, robot in enumerate(robots):
+                        robot.__init__(robot.id, ROBOT_STARTS[i % len(ROBOT_STARTS)], warehouse, demo_battery(i))
+                        p2p_network.register_robot(robot.id)
+                        p2p_network.restore_robot(robot.id)
+                    p2p_network.clear_log()
+                    metrics.__init__()
+                    sim_state.update(tick=0, paused=False)
+                    event_logger.clear()
+                    event_logger.add_event("system", "Consolidation inventory prepared from warehouse data", tick=0)
+                    await broadcast_state(build_state_message(0))
+                elif action == "fill_empty_rack":
+                    if baseline_running or sim_state["running"]:
+                        raise ValueError("A demonstration is already running")
+                    task_manager.consolidation.start(robots, sim_state["tick"])
+                    event_logger.add_event("system", task_manager.consolidation.message, tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
+                    if task_manager.remaining():
+                        sim_state.update(running=True, paused=False)
+                        asyncio.create_task(simulation_loop())
+                elif action == "resume_consolidation":
+                    mission = task_manager.consolidation
+                    if not mission.started or mission.status != "timed_out" or sim_state["running"]:
+                        raise ValueError("Only a timed-out consolidation can be resumed")
+                    mission.status = "running"
+                    sim_state.update(running=True, paused=False)
+                    asyncio.create_task(simulation_loop())
                 elif action == "cancel_task":
                     task = task_manager.cancel_task(int(command["task_id"]), robots)
                     event_logger.add_event("system", f"Task #{task.id} cancelled", tick=sim_state["tick"])
@@ -428,18 +461,11 @@ async def websocket_endpoint(ws: WebSocket):
                     task = task_manager.reassign_task(int(command["task_id"]), robots)
                     event_logger.add_event("auction", f"Task #{task.id} returned to the fleet auction", tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
-                elif action == "retry_task":
-                    task = task_manager.retry_task(int(command["task_id"]))
-                    event_logger.add_event("system", f"Task #{task.id} retry {task.retry_count}/{task.max_retries} queued", tick=sim_state["tick"])
-                    await broadcast_state(build_state_message(sim_state["tick"]))
-                elif action == "update_task_destination":
-                    task = task_manager.update_destination(int(command["task_id"]), command.get("destination"))
-                    event_logger.add_event("system", f"Task #{task.id} destination changed to {task.destination_label}", tick=sim_state["tick"])
-                    await broadcast_state(build_state_message(sim_state["tick"]))
                 elif action == "set_robot_available":
                     robot = find_robot(int(command["robot_id"]))
                     available = bool(command.get("available"))
-                    if not available and robot.carrying:
+                    task = next((t for t in task_manager.active_tasks if t.assigned_to == robot.id), None)
+                    if not available and (robot.carrying or getattr(robot, "handling", None) or (task and task.picked_up)):
                         raise ValueError("This unit is carrying a carton; complete delivery before making it unavailable")
                     robot.set_available(available, command.get("reason"))
                     if not available:
@@ -460,7 +486,10 @@ async def websocket_endpoint(ws: WebSocket):
                 elif action == "run_baseline" and not baseline_running:
                     baseline_running = True
                     asyncio.create_task(run_baseline_comparison())
+                else:
+                    raise ValueError(f"Unknown or unavailable command: {action}")
             except (ValueError, TypeError, KeyError) as error:
+                await broadcast_state(build_state_message(sim_state["tick"]))
                 await ws.send_text(json.dumps({"type": "command_error", "message": str(error)}))
     except WebSocketDisconnect:
         pass

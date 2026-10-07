@@ -81,6 +81,17 @@
           },
           "title": "Robot Starts",
           "type": "array"
+        },
+        "consolidation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConsolidationSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "title": "OperationalSettings",
@@ -207,6 +218,52 @@
         }
       },
       "title": "WarehouseMetadata",
+      "type": "object"
+    },
+    "StoredCarton": {
+      "properties": {
+        "slot": {
+          "title": "Slot",
+          "type": "string"
+        },
+        "cargo_id": {
+          "minLength": 1,
+          "title": "Cargo Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "cargo_id"
+      ],
+      "title": "StoredCarton",
+      "type": "object"
+    },
+    "ConsolidationSettings": {
+      "properties": {
+        "target_rack": {
+          "minLength": 1,
+          "title": "Target Rack",
+          "type": "string"
+        },
+        "capacity": {
+          "minimum": 1,
+          "title": "Capacity",
+          "type": "integer"
+        },
+        "initial_inventory": {
+          "items": {
+            "$ref": "#/$defs/StoredCarton"
+          },
+          "title": "Initial Inventory",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target_rack",
+        "capacity"
+      ],
+      "title": "ConsolidationSettings",
       "type": "object"
     }
   },

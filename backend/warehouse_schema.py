@@ -29,12 +29,24 @@ class WarehouseMetadata(BaseModel):
     unit: str = Field(default="meter", description="Measurement unit for dimensions.")
 
 
+class StoredCarton(BaseModel):
+    slot: str
+    cargo_id: str = Field(min_length=1)
+
+
+class ConsolidationSettings(BaseModel):
+    target_rack: str = Field(min_length=1)
+    capacity: int = Field(ge=1)
+    initial_inventory: list[StoredCarton] = Field(default_factory=list)
+
+
 class OperationalSettings(BaseModel):
     """Simulation and operational parameters associated with the facility."""
     target_islands: list[int] | None = Field(
         default=None,
         description="Indices of rack islands targeted for sequential putaway. None to spread across all."
     )
+    consolidation: ConsolidationSettings | None = None
     default_num_robots: int = Field(default=3, ge=1, le=50, description="Default fleet size for this floor.")
     robot_starts: list[tuple[int, int]] = Field(
         default_factory=list,

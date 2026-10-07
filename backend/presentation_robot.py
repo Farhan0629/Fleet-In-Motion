@@ -58,6 +58,7 @@ class PresentationRobot(Robot):
             self.handling = {
                 "kind": kind,
                 "task_id": task["id"],
+                "cargo_id": task.get("cargo_id", task["id"]),
                 "station": station,
                 "progress": 0.0,
                 "place": place,

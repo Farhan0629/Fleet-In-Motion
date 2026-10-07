@@ -10,6 +10,7 @@ export default function RobotStatus({ robot }) {
   const selectRobot = useStore((s) => s.selectRobot)
   const setFollowRobot = useStore((s) => s.setFollowRobot)
   const network = useStore((s) => s.network)
+  const consolidation = useStore((s) => s.tasks.consolidation?.enabled)
 
   const selected = selectedRobotId === robot.id
   const accent = ACCENTS[(robot.id - 1) % ACCENTS.length]
@@ -77,10 +78,10 @@ export default function RobotStatus({ robot }) {
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
         <p>Battery <span className="font-semibold" style={{ color: batteryTone(battery) }}>{Math.round(robot.battery)}%</span></p>
-        <p>Put away <span className="font-semibold text-slate-900">{robot.tasks_completed}</span></p>
+        <p>{consolidation ? 'Relocated' : 'Put away'} <span className="font-semibold text-slate-900">{robot.tasks_completed}</span></p>
         <p>Location <span className="font-semibold text-slate-900">({robot.x},{robot.y})</span></p>
         <p>Charge runs <span className="font-semibold text-slate-900">{robot.charge_cycles ?? 0}</span></p>
-        <p className="col-span-2">{robot.has_cargo ? `Carrying PKG-${String(robot.carrying_task_id || robot.task?.id || 0).padStart(3, '0')}${robot.task?.table_code ? ` · from ${robot.task.table_code}` : ''}${robot.task?.slot_code ? ` → slot ${robot.task.slot_code}` : ''}` : 'Empty handed'}</p>
+        <p className="col-span-2">{robot.has_cargo ? `Carrying ${robot.task?.cargo_id ?? `PKG-${String(robot.carrying_task_id || robot.task?.id || 0).padStart(3, '0')}`}${robot.task?.table_code ? ` · from ${robot.task.table_code}` : ''}${robot.task?.slot_code ? ` → slot ${robot.task.slot_code}` : ''}` : 'Empty handed'}</p>
       </div>
 
       <p className="mt-2 text-xs text-slate-600">
@@ -91,10 +92,10 @@ export default function RobotStatus({ robot }) {
       </p>
       <button
         type="button"
-        disabled={robot.has_cargo}
+        disabled={robot.has_cargo || Boolean(robot.handling)}
         onClick={() => sendCommand('set_robot_available', { robot_id: robot.id, available: robot.available === false })}
         className="mt-2 min-h-9 w-full rounded-md border border-slate-300 px-2 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-        title={robot.has_cargo ? 'Complete the current delivery first' : ''}
+        title={robot.has_cargo || robot.handling ? 'Complete the current transfer first' : ''}
       >
         {robot.available === false ? 'Return to service' : 'Mark unavailable'}
       </button>

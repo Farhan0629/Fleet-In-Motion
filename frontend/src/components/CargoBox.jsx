@@ -9,7 +9,7 @@ export default function CargoBox({ taskId, position = [0, 0, 0], scale = 1, rota
     const ctx = canvas.getContext('2d')
     ctx.fillStyle = '#faf8ee'; ctx.fillRect(0, 0, 256, 160)
     ctx.fillStyle = '#152438'; ctx.font = 'bold 32px Arial'
-    ctx.fillText(`PKG-${String(taskId ?? 0).padStart(3, '0')}`, 12, 44)
+    ctx.fillText(typeof taskId === 'string' ? taskId : `PKG-${String(taskId ?? 0).padStart(3, '0')}`, 12, 44)
     ctx.font = '18px Arial'; ctx.fillText('WAREHOUSE / HANDLE WITH CARE', 12, 70)
     for (let i = 0; i < 42; i++) ctx.fillRect(12 + i * 5.4, 85, i % 3 === 0 ? 3 : 1.5, 49)
     const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace

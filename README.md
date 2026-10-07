@@ -23,7 +23,7 @@ Fleet in Motion is a **simulation and validation project** for decentralized mul
 - vertex/swap conflict prevention and deadlock recovery;
 - a declarative warehouse schema and environment compiler;
 - three different warehouse environments using the same robot intelligence;
-- runtime semantic task creation and lifecycle controls;
+- inventory-driven dynamic rack consolidation;
 - battery, charging, barriers, and Wi-Fi partition drills;
 - a React/Three.js operational digital twin;
 - deterministic regression and benchmark tooling.
@@ -42,8 +42,8 @@ This is currently a **software simulation**. It is not a ROS2 driver, a physical
 
 - Three validated warehouse definitions: 20×20, 28×16, and 36×24.
 - Warehouse-independent `Robot`, A*, P2P, auction, collision, deadlock, battery, and charging logic.
-- Static putaway demonstrations and runtime semantic task insertion.
-- Task priority, assignment, completion, cancellation, reassignment, retry, and pending destination changes.
+- Static putaway demonstrations and dynamic rack consolidation.
+- Deterministic inventory selection, existing bid assignment, completion, cancellation and uncollected-task reauction.
 - Temporary aisle barriers and dynamic replanning.
 - Simulated radio partitions with local occupancy sensing fallback.
 - Addressable rack slots with reservation, storage, pickup, and physical carton ownership.
@@ -72,7 +72,7 @@ flowchart TB
     Definition[Warehouse JSON definition]
     Compiler[Schema + Environment compiler]
     Runtime[Runtime Warehouse\nwalkability, slots, stations, zones]
-    Tasks[Task Manager\nmanifest + semantic task lifecycle]
+    Tasks[Task Manager\nmanifest + inventory-driven consolidation]
     Fleet[Robot agents\nlocal A* + bids + battery]
     Mesh[P2P network simulator\nposition, intent, hazards, chargers]
     Safety[Conflict and deadlock checks]
@@ -290,29 +290,24 @@ Running the repository outside a continuously synchronized OneDrive folder can a
 
 Barriers can only be added to free, unoccupied aisle cells while the floor is stopped or paused.
 
-### Dynamic semantic tasks
+### Dynamic rack consolidation
 
-The **Task queue** panel can insert a task while the simulation is running. Sources and destinations are station or zone identifiers supplied by the active warehouse—not UI coordinates.
+Select a warehouse while stopped, click **Prepare inventory**, then **Fill Empty Rack**.
+Setup loads explicit existing cartons from warehouse data and keeps its designated
+rack completely empty. Activation inspects live stored inventory, ranks feasible
+rack-to-rack moves by A* route cost, reserves unique source/destination slots, and
+feeds relocation tasks into the existing fleet auction. Cartons physically leave
+source slots, travel with their winning robots and settle in target slots.
 
-Examples:
+The panel shows target capacity, source availability, generated/pending/active/
+completed tasks, progress, robot ownership and collision/deadlock counts. Missing
+or full targets, unavailable routes, insufficient inventory, cancellation and robot
+unavailability have explicit mission states. Timeout retains inventory and allows
+**Resume retained mission**. Cancellation/reassignment are prohibited after pickup.
 
-- Receiving → Rack A
-- Rack C → Packing
-- Packing → Dispatch
-- Receiving → QA
-
-Supported lifecycle operations:
-
-- create;
-- prioritize;
-- assign through bidding;
-- execute and complete;
-- cancel before pickup;
-- return an uncollected assignment to auction;
-- change a pending destination;
-- retry a cancelled or failed task up to its retry limit.
-
-A task already physically carried by a robot cannot be cancelled or reassigned. Forced mid-carry failure recovery is intentionally reserved for later resilience work.
+The original **Start demonstration** remains the Phase 1–5 table putaway scenario.
+See [PHASE6_DYNAMIC_TASKS.md](./PHASE6_DYNAMIC_TASKS.md) for the data contract,
+selection policy, safety rules and verification results.
 
 ---
 
@@ -474,11 +469,11 @@ Send JSON objects with an `action` field:
 | `clear_blocks` | — | Remove all temporary barriers |
 | `toggle_partition` | `robot_id` | Toggle simulated Wi-Fi loss |
 | `boost_battery` | `robot_id` | Set one robot to full charge |
-| `create_task` | `source`, `destination`, optional `priority`, `max_retries` | Insert a semantic task |
+| `prepare_consolidation` | — | Explicitly load warehouse-defined stored inventory while stopped |
+| `fill_empty_rack` | — | Inspect inventory and start rack consolidation |
+| `resume_consolidation` | — | Continue retained work after timeout |
 | `cancel_task` | `task_id` | Cancel eligible work |
 | `reassign_task` | `task_id` | Return an uncollected assignment to auction |
-| `retry_task` | `task_id` | Retry eligible terminal work |
-| `update_task_destination` | `task_id`, `destination` | Change a pending destination |
 | `set_robot_available` | `robot_id`, `available`, optional `reason` | Remove/return a robot from service |
 | `run_baseline` | — | Start the built-in baseline comparison |
 
@@ -497,7 +492,7 @@ Fleet-In-Motion/
 │   ├── pathfinding.py             Local grid A*
 │   ├── p2p.py                     Simulated peer inboxes and network partitions
 │   ├── collision.py               Vertex/swap auditing and wait-for deadlock resolution
-│   ├── task_manager.py            Static manifest and dynamic task lifecycle
+│   ├── task_manager.py            Static manifest and consolidation task lifecycle
 │   ├── warehouse_schema.py        Pydantic warehouse definition models
 │   ├── environment_engine.py      Compiler, topology checks and diagnostics
 │   ├── warehouse.py               Runtime grid, semantics, slots, inventory and barriers
@@ -515,7 +510,7 @@ Fleet-In-Motion/
 │   ├── package.json               Frontend scripts and dependencies
 │   └── vite.config.js             Vite/Tailwind setup and local WebSocket proxy
 ├── PHASE5_WAREHOUSE3.md           WH3 topology, visual and validation record
-├── PHASE6_DYNAMIC_TASKS.md        Dynamic task behavior and limitations
+├── PHASE6_DYNAMIC_TASKS.md        Rack consolidation behavior and limitations
 ├── PUTAWAY_ROUND.md               Carton/storage workflow details
 ├── BARRIER_NAVIGATION.md          Barrier and rerouting behavior
 ├── CHANGES.md                     Development history and measured results
@@ -553,6 +548,7 @@ Change these carefully and rerun all tests. Benchmark results are only comparabl
 
 ```bash
 cd backend
+pip install -r requirements-dev.txt
 python -m unittest discover -s . -p "test_*.py"
 ```
 
@@ -622,11 +618,11 @@ For geometry changes, also run the application and inspect every camera mode dur
 
 ### Add a new task type
 
-1. Represent source and destination using semantic station/zone IDs.
-2. Resolve them through `Warehouse.resolve_semantic_location`.
+1. Represent source and destination using warehouse-owned slot/station/zone IDs.
+2. Resolve real shelf cells and access faces through the runtime `Warehouse`.
 3. Preserve carton ownership and rack reservation rules.
 4. Extend `Task.as_payload` and `_serialize` only with warehouse-independent fields.
-5. Add lifecycle tests for cancellation, reassignment, retry and robot availability.
+5. Add lifecycle tests for inventory conservation, cancellation, reauction and robot availability.
 
 ### Add a visual machine
 

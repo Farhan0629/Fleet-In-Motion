@@ -65,6 +65,7 @@ class Warehouse:
         zones: list[dict] | None = None,
         markings: list[dict] | None = None,
         exterior_assets: list[dict] | None = None,
+        consolidation: dict | None = None,
     ):
         if layout is None:
             layout = LAYOUT
@@ -79,6 +80,7 @@ class Warehouse:
         self.zones = zones or []
         self.markings = markings or []
         self.exterior_assets = exterior_assets or []
+        self.consolidation = consolidation
         self.target_islands = target_islands
         self.robot_starts = robot_starts
         self.num_robots = num_robots
@@ -115,6 +117,8 @@ class Warehouse:
             layout=definition.layout,
             width=definition.dimensions.width,
             height=definition.dimensions.height,
+            consolidation=(definition.operational_settings.consolidation.model_dump()
+                           if definition.operational_settings.consolidation else None),
             target_islands=definition.operational_settings.target_islands,
             robot_starts=definition.operational_settings.robot_starts,
             num_robots=definition.operational_settings.default_num_robots,
@@ -146,6 +150,8 @@ class Warehouse:
             layout=definition.layout,
             width=definition.dimensions.width,
             height=definition.dimensions.height,
+            consolidation=(definition.operational_settings.consolidation.model_dump()
+                           if definition.operational_settings.consolidation else None),
             target_islands=definition.operational_settings.target_islands,
             robot_starts=definition.operational_settings.robot_starts,
             num_robots=definition.operational_settings.default_num_robots,
@@ -171,6 +177,7 @@ class Warehouse:
             dimensions=WarehouseDimensions(width=self.width, height=self.height, cell_size=1.0),
             layout=self.raw_layout,
             operational_settings=OperationalSettings(
+                consolidation=self.consolidation,
                 target_islands=getattr(self, "target_islands", None),
                 default_num_robots=getattr(self, "num_robots", 3),
                 robot_starts=getattr(self, "robot_starts", []) or [],
@@ -426,6 +433,7 @@ class Warehouse:
                     "access": access,
                     "state": "empty",   # "empty" | "reserved" | "stored"
                     "task_id": None,
+                    "cargo_id": None,
                 }
                 self.rack_slots.append(slot)
                 slot_ids.append(slot["id"])
@@ -477,6 +485,7 @@ class Warehouse:
             return False
         slot["state"] = "empty"
         slot["task_id"] = None
+        slot["cargo_id"] = None
         return True
 
     def reset_racks(self):
@@ -484,6 +493,7 @@ class Warehouse:
         for slot in self.rack_slots:
             slot["state"] = "empty"
             slot["task_id"] = None
+            slot["cargo_id"] = None
 
     def stored_slots(self) -> list[dict]:
         return [slot for slot in self.rack_slots if slot["state"] == "stored"]
@@ -530,6 +540,7 @@ class Warehouse:
             "markings": getattr(self, "markings", []),
             "exterior_assets": getattr(self, "exterior_assets", []),
             "semantic_locations": self.semantic_locations(),
+            "consolidation": self.consolidation,
             "tables": [
                 {
                     "id": table["id"],
@@ -546,6 +557,7 @@ class Warehouse:
                     "id": slot["id"],
                     "code": slot["code"],
                     "island": slot["island"],
+                    "cargo_id": slot.get("cargo_id"),
                     "cell": list(slot["cell"]),
                     "access": list(slot["access"]),
                     "state": slot["state"],

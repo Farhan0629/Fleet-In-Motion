@@ -17,6 +17,7 @@ export function getRobotStatusMeta(robot) {
   if (robot?.parked) return STATUS_COPY.parked
   if (['waiting', 'yielding'].includes(robot?.status)) return STATUS_COPY[robot.status]
   if (robot?.has_cargo) return STATUS_COPY.moving_to_dropoff
+  if (robot?.status === 'moving_to_pickup' && robot.task?.pickup_kind === 'rack') return { label: 'To source rack', tone: 'amber' }
   return STATUS_COPY[robot?.status] || { label: robot?.status || 'Unknown', tone: 'slate' }
 }
 export function getRobotNextDestination(robot) {
@@ -26,7 +27,7 @@ export function getRobotNextDestination(robot) {
   if (!robot?.task) return null
   const coordinate = robot.has_cargo ? robot.task.dropoff : robot.task.pickup
   const kind = robot.has_cargo ? robot.task.dropoff_kind : robot.task.pickup_kind
-  if (kind === 'rack') return { type: robot.task.slot_code ? `RACK ${robot.task.slot_code}` : 'RACK', coordinate }
+  if (kind === 'rack') { const code = robot.has_cargo ? robot.task.dropoff_slot_code || robot.task.slot_code : robot.task.pickup_slot_code || robot.task.slot_code; return { type: code ? `RACK ${code}` : 'RACK', coordinate } }
   return { type: robot.task.table_code ? `TABLE ${robot.task.table_code}` : 'TABLE', coordinate }
 }
 // `warehouse` carries the physical truth: table state and slot state. Cartons
@@ -40,9 +41,9 @@ export function mapCargoLifecycle(tasks, robots, warehouse) {
     .map((table) => ({ taskId: table.task_id, code: table.code, cell: table.cell, side: table.side }))
   const storedCargo = (floor.racks || [])
     .filter((slot) => slot.state === 'stored' && !transfers.has(slot.task_id))
-    .map((slot) => ({ taskId: slot.task_id, code: slot.code, cell: slot.cell, access: slot.access }))
-  const carryingCargo = fleet.filter((r) => r.has_cargo && r.task && !r.handling).map((r) => ({ taskId: r.task.id, robotId: r.id, dropoff: r.task.dropoff, slotCode: r.task.slot_code }))
-  const handlingCargo = fleet.filter((r) => r.handling).map((r) => ({ ...r.handling, robotId: r.id }))
+    .map((slot) => ({ taskId: slot.cargo_id ?? slot.task_id, cargoId: slot.cargo_id ?? slot.task_id, code: slot.code, cell: slot.cell, access: slot.access }))
+  const carryingCargo = fleet.filter((r) => r.has_cargo && r.task && !r.handling).map((r) => ({ taskId: r.task.cargo_id ?? r.task.id, robotId: r.id, dropoff: r.task.dropoff, slotCode: r.task.slot_code }))
+  const handlingCargo = fleet.filter((r) => r.handling).map((r) => ({ ...r.handling, cargoId: r.handling.cargo_id ?? r.handling.task_id, robotId: r.id }))
   return { tableCargo, storedCargo, carryingCargo, handlingCargo }
 }
 export function getMissionSummary(tasks) {

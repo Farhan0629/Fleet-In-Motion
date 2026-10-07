@@ -1,86 +1,110 @@
-# Phase 6 — Dynamic Task System
+# Phase 6 — Dynamic Rack Consolidation
 
-## Outcome
+Phase 6 replaces the generic runtime semantic-task editor with one inventory-driven
+mission: move existing cartons from occupied racks into a designated empty rack.
+There is no second allocator, random task generation, or warehouse-specific robot logic.
 
-Phase 6 extends the existing contract-net task auction with runtime semantic missions. It does not
-replace A*, P2P coordination, bidding, conflict handling, or warehouse compilation.
+## Run it
 
-Operators can now insert a task while the simulation is running, choose priority, cancel or
-reassign uncollected work, change a pending destination, retry cancelled work within a configured
-limit, and take an idle or pre-pickup robot out of service. The same `TaskManager` resolves task
-locations from each warehouse definition.
+1. Select Warehouse #1, #2, or #3 while the demonstration is stopped.
+2. Click **Prepare inventory** in **Dynamic rack consolidation**. This explicit
+   setup replaces the stopped demo's table manifest with the warehouse-defined
+   stored inventory. Every non-target rack is occupied; exactly one target is empty.
+3. Click **Fill Empty Rack**. This inspects the live inventory without resetting,
+   creating new cartons, or changing barriers.
+4. Watch target capacity, source availability, generated/pending/active/completed
+   tasks, progress, robot assignments, and collision/deadlock counters.
 
-## What already existed
+The existing **Start demonstration** command still resets and runs the original
+Phase 1–5 table-to-rack putaway scenario. It is separate from consolidation setup.
+Preparing another inventory round never overwrites an active or carried transfer.
 
-- A static startup manifest and contract-net bid allocation.
-- Table-to-rack putaway tasks with physical carton ownership.
-- Re-auction when a robot abandoned an uncollected task to charge.
-- Semantic zones and stations in the Warehouse #2 and #3 definitions.
+## Data contract
 
-## What changed
+Each warehouse's `operational_settings.consolidation` declares:
 
-- The runtime `Warehouse` now preserves declared stations and exposes task-facing semantic
-  locations.
-- Semantic references resolve to validated aisle cells or real rack slots. Robot tasks receive
-  coordinates only after this environment-layer resolution.
-- Tasks now carry priority, lifecycle status, retry limits, semantic source/destination labels,
-  creation tick, and separate pickup/dropoff rack-slot identities.
-- Pending tasks are auctioned by priority, then creation time.
-- Added create, cancel, reassign, retry, destination-change, and robot-availability WebSocket
-  commands.
-- Added task creation and lifecycle controls to the existing dashboard.
-- Mission completion uses the live queue instead of a manifest-size snapshot, so tasks inserted
-  during a run are included.
+- `target_rack`: an existing compiled rack-island code, not coordinates;
+- `capacity`: number of target slots to fill (1 through the compiled slot count);
+- `initial_inventory`: explicit `{slot, cargo_id}` records for existing cartons.
 
-## Lifecycle and safety rules
+The target's slots, shelf cells and aisle access faces come from the compiled
+warehouse layout. Fixture validation rejects invalid slots, target inventory,
+duplicate slot/cargo IDs and excessive capacity before mutating the floor.
+The default capacities are WH1: 4, WH2: 6, WH3: 8. Changing the designated rack or
+capacity in data does not change the mission implementation.
 
-`pending → assigned → completed` is the normal path. An uncollected assigned task can return to
-`pending`; pending or uncollected work can be cancelled and retried. A carton already on a robot
-cannot be cancelled, reassigned, or stranded by taking that robot out of service. That limitation
-is explicit: forced mid-carry robot failure and recovery belong to Phase 7.
+## Selection and execution
 
-Rack inventory remains physical:
+`ConsolidationMission` is a producer/observer of the existing `TaskManager` queue:
 
-- rack pickup selects a stored slot and empties it when lifting starts;
-- rack dropoff reserves an empty slot and marks it stored after placement;
-- table pickup loads that table and empties it when lifting starts;
-- one task cannot claim inventory already claimed by another task.
+1. Discover unclaimed, stored cartons outside the target.
+2. Discover empty target slots up to configured capacity.
+3. Evaluate legal pickup/dropoff faces with the existing A*. Reject blocked
+   endpoints and routes not reachable from the fleet. Transient robot traffic
+   remains the robot/P2P planner's responsibility.
+4. Sort feasible source/destination pairs by A* relocation cost, then source and
+   destination slot code. Greedily reserve distinct sources and destinations in
+   that order; this is deterministic selection, not a global optimizer.
+5. Generate rack-to-rack tasks containing separate source/destination slots,
+   rack IDs, stable cargo ID, and lifecycle state.
+6. The unchanged `allocate_tasks` auction asks robots for their existing bids;
+   highest bid wins, existing robot-ID tie-break and P2P result broadcast apply.
+7. Existing robot navigation and handling dwell perform pickup → transport →
+   placement at the real rack faces and shelf cells.
+8. At lift start, the source becomes empty and the transfer animation owns the
+   carton. At lift end the robot carries it. At placement end the reserved target
+   becomes stored. Cargo identity never changes to a new task ID.
+9. Refresh live claims, replenish cancelled/failed uncollected work with other
+   feasible cartons, and finish when stored target occupancy reaches capacity.
 
-## WH3 physical-clearance contract
+## Failures and scope
 
-The WH3 semantic zones intentionally include operating and service areas larger than their
-machines. Earlier rendering placed some solid objects across otherwise valid A* aisle cells.
+- Missing/invalid target, nonempty target, already-full target: actionable error
+  and visible mission state, no implicit reset.
+- Insufficient cartons or unreachable source/destination routes: failed/partial
+  state with actual occupied capacity, never fabricated success.
+- No available robot: work remains queued with `waiting_for_robots`; return a
+  robot through the existing availability command to resume bidding.
+- Cancellation before pickup releases claims but keeps the source carton stored.
+  Cancelled/failed cargo is excluded from automatic reselection that round.
+- Losing a claim before pickup fails the task and releases its other reservation.
+  Losing a destination during a carried transfer pauses the mission with ownership
+  retained rather than placing into an unavailable slot.
+- A picked-up carton cannot be cancelled, reassigned, or taken out of service.
+- Episode timeout preserves pending/active work and physical ownership. The
+  dashboard's **Resume retained mission** continues without inventory reset.
+- Robot-local blocked-route telemetry remains visible for mid-mission barriers.
 
-Zones can declare a rectangular `metadata.navigation_footprint` or multiple
-`metadata.navigation_footprints`. The compiler rejects any declared solid footprint containing a
-walkable cell. Auxiliary models derive their center and size from the same data. The sortation
-loop uses a multipart U-shaped footprint, while the ASRS uses its central machine footprint.
-
-The ASRS transfer decks are ground-supported and contained inside the blocked core. Dock ramps and
-decorative bollards that occupied task/aisle cells were removed. This remains a
-schema/compiler/rendering correction; no robot-, task-, or warehouse-ID branch was added.
+Forced mid-carry robot failure/recovery is not implemented. No Phase 7 work was
+started. `robot.py`, `pathfinding.py`, `p2p.py`, `collision.py`, `baseline.py` and
+`config.py` are unchanged. Presentation handling only gained cargo-ID telemetry.
 
 ## Verification
 
-Run:
-
 ```bash
 cd backend
-python -m unittest discover -s . -p "test_*.py"
-
+pip install -r requirements-dev.txt
+python -m unittest discover -s . -p 'test_*.py'
 cd ../frontend
 npm ci
 npm test
 npm run build
 ```
 
-The regression suite checks the complete dynamic lifecycle, priority ordering, semantic task
-creation in all three warehouses, robot unavailability/re-auction, rack source and destination
-inventory, and zero robot entries into every declared WH3 solid footprint during deterministic
-putaway episodes.
+Tests cover configured empty-target discovery, inventory discovery, deterministic
+lowest-cost selection, valid unique claims, the original auction, physical rack
+pickup/placement faces, occupancy conservation every tick, cancellation/failure,
+unavailability/reauction, timeout retention, alternate targets/capacity, all three
+warehouses, real WebSocket commands and the original putaway start command.
 
-## Scope boundary
+Full-charge deterministic consolidation runs:
 
-This is a simulated dynamic task manager. It does not yet implement forced mid-carry robot
-failure recovery, station outage policies, large-fleet scaling, arbitrary warehouse import, ROS2,
-or physical robot control. Those remain later phases.
+| Warehouse | Relocations | Filled at tick | Robots used | Collisions | Deadlocks |
+| --- | ---: | ---: | --- | ---: | ---: |
+| #1 | 4 | 59 | 1, 2, 3 | 0 | 0 |
+| #2 | 6 | 66 | 1, 2, 3 | 0 | 0 |
+| #3 | 8 | 109 | 1, 2, 3 | 0 | 0 |
+
+Real WebSocket runs using unchanged default demo batteries also completed and
+parked the fleet at ticks 81, 90 and 150 respectively. The local production UI
+was exercised through setup → Fill Empty Rack → 100% completion in all warehouses.

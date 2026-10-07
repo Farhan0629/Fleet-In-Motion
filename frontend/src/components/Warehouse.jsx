@@ -329,7 +329,7 @@ export default function Warehouse() {
         stored slot turns green and carries the real package until it is picked. */}
     {liveSlots.map((slot) => <group key={slot.id}>
       <mesh position={[slot.access[0] + 0.5, 0.014, slot.access[1] + 0.5]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color={slot.state === 'stored' ? '#297359' : '#b8862c'} transparent opacity={0.22} depthWrite={false} /></mesh>
-      {slot.state === 'stored' && cargo.storedCargo.some((item) => item.taskId === slot.task_id) && <CargoBox taskId={slot.task_id} position={rackSlotWorldPosition(slot, shelfView)} />}
+      {slot.state === 'stored' && cargo.storedCargo.some((item) => item.taskId === (slot.cargo_id ?? slot.task_id)) && <CargoBox taskId={slot.cargo_id ?? slot.task_id} position={rackSlotWorldPosition(slot, shelfView)} />}
     </group>)}
     {(warehouse.tables || []).map((table) => <Station key={table.code} table={table} handling={handling} staged={cargo.tableCargo.find((item) => item.cell[0] === table.cell[0] && item.cell[1] === table.cell[1])} />)}
     {(warehouse.chargers || []).map(([x, z], i) => <ChargerPad key={`c${i}`} cell={[x, z]} index={i} occupant={padOccupant(x, z)} claimant={padClaimant(x, z)} />)}
