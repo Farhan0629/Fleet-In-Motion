@@ -10,7 +10,7 @@ function TaskRow({ task, robots }) {
       <span>{owner?.name || task.status}</span>
     </div>
     <p className="mt-1 font-mono text-[11px]">{task.source_label || task.table_code || 'Loading'} → {task.destination_label || task.slot_code || 'Delivery'}</p>
-    {task.stage === 'consolidation' && <p className="mt-1 text-[10px] text-slate-500">{task.status === 'completed' ? 'Placed in rack' : task.picked_up ? 'Pickup complete · transporting / placing' : task.status}</p>}
+    {task.stage === 'consolidation' && <p className="mt-1 text-[10px] text-slate-500">{task.recovery_required ? `Cargo recovery required · ${task.status.replaceAll('_', ' ')}` : task.status === 'completed' ? 'Placed in rack' : task.picked_up ? 'Pickup complete · transporting / placing' : task.status}</p>}
     {task.failure_reason && <p className="mt-1 text-rose-700">{task.failure_reason}</p>}
     {task.stage === 'consolidation' && ['pending', 'assigned'].includes(task.status) && !task.picked_up && <button type="button" onClick={() => sendCommand('cancel_task', { task_id: task.id })} className="mt-2 rounded border border-rose-300 px-2 py-1 text-[10px] text-rose-700">Cancel relocation</button>}
   </div>

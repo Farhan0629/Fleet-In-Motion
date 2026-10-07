@@ -9,6 +9,7 @@ class P2PMessage:
     msg_type: str           # from MESSAGE_TYPES in config.py
     payload: dict           # message data
     timestamp: float = field(default_factory=time.time)
+    epoch: int = 0
 
 class P2PNetwork:
     """
@@ -21,11 +22,13 @@ class P2PNetwork:
         self.inboxes: dict[int, asyncio.Queue] = {}
         self.message_log: list[dict] = []
         self.is_partitioned: dict[int, bool] = {}
+        self.epochs: dict[int, int] = {}
     
     def register_robot(self, robot_id: int):
         """Create an inbox for a new robot."""
         self.inboxes[robot_id] = asyncio.Queue()
         self.is_partitioned[robot_id] = False
+        self.epochs[robot_id] = self.epochs.get(robot_id, 0) + 1
     
     def broadcast(self, sender_id: int, msg_type: str, payload: dict):
         """
@@ -35,7 +38,7 @@ class P2PNetwork:
         if self.is_partitioned.get(sender_id, False):
             return
         
-        msg = P2PMessage(sender_id=sender_id, msg_type=msg_type, payload=payload)
+        msg = P2PMessage(sender_id=sender_id, msg_type=msg_type, payload=dict(payload), epoch=self.epochs.get(sender_id, 0))
         
         for robot_id, inbox in self.inboxes.items():
             if robot_id != sender_id and not self.is_partitioned.get(robot_id, False):
@@ -53,7 +56,7 @@ class P2PNetwork:
         if self.is_partitioned.get(sender_id, False) or self.is_partitioned.get(target_id, False):
             return
         
-        msg = P2PMessage(sender_id=sender_id, msg_type=msg_type, payload=payload)
+        msg = P2PMessage(sender_id=sender_id, msg_type=msg_type, payload=dict(payload), epoch=self.epochs.get(sender_id, 0))
         if target_id in self.inboxes:
             self.inboxes[target_id].put_nowait(msg)
             self.message_log.append({
@@ -71,7 +74,12 @@ class P2PNetwork:
         inbox = self.inboxes[robot_id]
         while not inbox.empty():
             try:
-                messages.append(inbox.get_nowait())
+                msg = inbox.get_nowait()
+                # Queued pre-partition/previous-connection packets are not truth.
+                if (not self.is_partitioned.get(robot_id, False)
+                        and not self.is_partitioned.get(msg.sender_id, False)
+                        and msg.epoch == self.epochs.get(msg.sender_id, 0)):
+                    messages.append(msg)
             except asyncio.QueueEmpty:
                 break
         return messages
@@ -83,10 +91,21 @@ class P2PNetwork:
     def partition_robot(self, robot_id: int):
         """Simulate network partition (Wi-Fi dead zone)."""
         self.is_partitioned[robot_id] = True
+        self.epochs[robot_id] = self.epochs.get(robot_id, 0) + 1
+        self._clear_inbox(robot_id)
     
     def restore_robot(self, robot_id: int):
-        """Restore network connectivity."""
+        """Restore a fresh connection, never replay old traffic predictions."""
+        if self.is_partitioned.get(robot_id, False):
+            self.epochs[robot_id] = self.epochs.get(robot_id, 0) + 1
+            self._clear_inbox(robot_id)
         self.is_partitioned[robot_id] = False
+
+    def _clear_inbox(self, robot_id):
+        inbox = self.inboxes.get(robot_id)
+        if inbox:
+            while not inbox.empty():
+                inbox.get_nowait()
     
     def partitioned_ids(self) -> list[int]:
         """Robot ids currently inside a Wi-Fi dead zone."""

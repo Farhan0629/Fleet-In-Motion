@@ -124,7 +124,7 @@ export default function Robot({ robot, selected = false, onSelect }) {
   const battery = robot.battery ?? 100
   // A rack transfer meets the shelf deck, not a table top, and the deck height
   // follows the same low-rack toggle the shelving itself uses.
-  const station = handling?.place === 'rack' ? (shelfView === 'lowRack' ? RACK_STATION_LOW : RACK_STATION_HIGH) : STATION
+  const station = handling?.handoff_station || (handling?.place === 'rack' ? (shelfView === 'lowRack' ? RACK_STATION_LOW : RACK_STATION_HIGH) : STATION)
 
   useEffect(() => {
     queueMotion(motion.current, robot.x + 0.5, robot.y + 0.5, 0.1 / Math.max(0.1, sim.speed), reduced)
@@ -167,7 +167,7 @@ export default function Robot({ robot, selected = false, onSelect }) {
         <Shell at={[0, 0.86, 0]} size={[0.21, 0.10, 0.135]} color={JOINT} />
         <Shell at={[0, RIG.chest, 0]} size={[0.23, 0.25, 0.15]} />
         <Shell at={[0, 1.22, 0.125]} size={[0.165, 0.135, 0.05]} color={color} />
-        <mesh position={[0, 1.08, 0.15]}><boxGeometry args={[0.18, 0.035, 0.012]} /><meshBasicMaterial color={offline ? '#e0546a' : charging || parked ? '#6ee7a8' : handling ? '#f2b544' : '#9ed8d3'} /></mesh>
+        <mesh position={[0, 1.08, 0.15]}><boxGeometry args={[0.18, 0.035, 0.012]} /><meshBasicMaterial color={robot.failed || offline ? '#e0546a' : charging || parked ? '#6ee7a8' : handling ? '#f2b544' : '#9ed8d3'} /></mesh>
         <Shell at={[0, 1.18, -0.15]} size={[0.16, 0.18, 0.072]} color={JOINT} />
         <BatteryPack level={battery} charging={charging} />
         {/* Hide head components when camera is inside this robot's eyes to prevent near-clipping */}
@@ -189,8 +189,8 @@ export default function Robot({ robot, selected = false, onSelect }) {
           small. Hidden in first-person POV so it does not obstruct the eye view. */}
       {!isPovSelf && (
         <Html position={[0, 1.82, 0]} center zIndexRange={[12, 0]} style={{ pointerEvents: 'none' }}>
-          <button onClick={() => onSelect?.(robot.id)} aria-label={`Inspect ${name}${offline ? ', radio offline' : ''}${charging ? `, charging at ${Math.round(battery)} percent` : ''}${parked ? ', parked and charged' : ''}`} style={{ pointerEvents: 'auto', whiteSpace: 'nowrap', padding: '2px 8px', fontSize: 11, lineHeight: '16px', fontWeight: 600, letterSpacing: '0.02em', borderRadius: 999, border: `1px solid ${offline ? '#e0546a' : charging || parked ? '#297359' : color}`, background: selected ? color : '#ffffffee', color: selected ? '#ffffff' : '#243141', boxShadow: '0 1px 4px #15243826' }}>
-            {name}{offline ? ' ✕' : ''}{charging || parked ? ` ⚡${Math.round(battery)}%` : ''}
+          <button onClick={() => onSelect?.(robot.id)} aria-label={`Inspect ${name}${offline ? ', radio offline' : ''}${charging ? `, charging at ${Math.round(battery)} percent` : ''}${parked ? ', parked and charged' : ''}`} style={{ pointerEvents: 'auto', whiteSpace: 'nowrap', padding: '2px 8px', fontSize: 11, lineHeight: '16px', fontWeight: 600, letterSpacing: '0.02em', borderRadius: 999, border: `1px solid ${robot.failed || offline ? '#e0546a' : charging || parked ? '#297359' : color}`, background: selected ? color : '#ffffffee', color: selected ? '#ffffff' : '#243141', boxShadow: '0 1px 4px #15243826' }}>
+            {name}{robot.failed ? ' · FAILED' : offline ? ' ✕' : ''}{charging || parked ? ` ⚡${Math.round(battery)}%` : ''}
           </button>
         </Html>
       )}

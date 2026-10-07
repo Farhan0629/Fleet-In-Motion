@@ -35,6 +35,8 @@ class PresentationRobot(Robot):
             super().__init__(robot_id, start_pos, warehouse, battery)
         self.handling = None
         self._handling_start = None
+        self.failed = False
+        self.communication_mode = "online"
 
     def _handle_arrival(self, tick, p2p_network):
         if not self.current_task:
@@ -45,7 +47,9 @@ class PresentationRobot(Robot):
             station = list(task["dropoff" if self.carrying else "pickup"])
             place = task.get("dropoff_kind" if self.carrying else "pickup_kind", "table")
             slot_cell = task.get(f"{kind}_slot_cell") or task.get("slot_cell")
-            if place == "rack" and slot_cell:
+            if place == "recovery":
+                target = list(task["recovery_cell"])
+            elif place == "rack" and slot_cell:
                 target = list(slot_cell)
             else:
                 direction = {
@@ -67,6 +71,16 @@ class PresentationRobot(Robot):
                 "stage": task.get("stage", "direct"),
                 "slot_code": task.get(f"{kind}_slot_code") or task.get("slot_code"),
             }
+            if place == "recovery":
+                # Transform the failed unit's actual carry pose into this
+                # unit's local coordinates for a continuous adjacent handoff.
+                import math
+                world = task["recovery_cargo_position"]
+                yaw = math.pi / 2 - math.radians(self.handling["face"])
+                dx, dz = world[0] - self.x - .5, world[2] - self.y - .5
+                self.handling["handoff_station"] = [math.cos(yaw)*dx - math.sin(yaw)*dz,
+                                                    world[1], math.sin(yaw)*dx + math.cos(yaw)*dz]
+                self.handling["failed_robot_id"] = task.get("failed_robot_id")
             self._handling_start = tick
             self.status = "placing" if self.carrying else "picking_up"
             self.is_yielding = False
@@ -78,6 +92,10 @@ class PresentationRobot(Robot):
         return "handling"
 
     def tick(self, current_tick, p2p_network, event_logger=None):
+        self.communication_mode = "local" if getattr(p2p_network, "is_partitioned", {}).get(self.id, False) else "online"
+        if self.failed:
+            self.prev_x, self.prev_y = self.x, self.y
+            return "failed"
         if self.handling is None:
             return super().tick(current_tick, p2p_network, event_logger)
         start = time.perf_counter()
@@ -97,6 +115,23 @@ class PresentationRobot(Robot):
         self.decision_time_ms = (time.perf_counter() - start) * 1000
         return action
 
+    def calculate_bid(self, task):
+        return 0.0 if self.failed else super().calculate_bid(task)
+
+    def _navigation_goals(self):
+        if self.current_task and not self.carrying and self.current_task.get("recovery_required"):
+            x, y = self.current_task["recovery_cell"]
+            preferred = tuple(self.current_task["pickup"])
+            return sorted([cell for cell in ((x-1,y), (x+1,y), (x,y-1), (x,y+1))
+                           if self.warehouse.is_walkable(*cell)], key=lambda cell: (cell != preferred, cell))
+        return super()._navigation_goals()
+
+    def _occupied_cells(self):
+        occupied = super()._occupied_cells()
+        if self.current_task and self.current_task.get("recovery_required"):
+            occupied.add(tuple(self.current_task["recovery_cell"]))
+        return occupied
+
     def _broadcast_intent(self, p2p_network, tick):
         if self.handling:
             p2p_network.broadcast(self.id, "intent", {"path": [], "dist": 0, "tick": tick})
@@ -112,11 +147,12 @@ class PresentationRobot(Robot):
     def park_for_charging(self, p2p_network=None, tick=0, event_logger=None):
         # Same rule for the end-of-round dock: a carton in mid-air is never
         # left hanging because the round finished.
-        if self.handling is not None:
+        if self.failed or self.handling is not None:
             return False
         return super().park_for_charging(p2p_network, tick, event_logger)
 
     def to_dict(self):
         result = super().to_dict()
         result["handling"] = dict(self.handling) if self.handling else None
+        result["failed"] = self.failed
         return result

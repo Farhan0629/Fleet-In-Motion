@@ -59,6 +59,8 @@ class ConsolidationMission:
         for name in ('pending_tasks', 'active_tasks', 'completed_tasks', 'cancelled_tasks', 'failed_tasks', 'all_tasks'):
             getattr(self.manager, name).clear()
         self.manager.stored_count = 0
+        from resilience import FleetResilience
+        self.manager.resilience = FleetResilience(self.manager)
         self.enabled = True
         self.status = 'ready'
         self.message = 'Inventory prepared; target rack is completely empty'
@@ -151,6 +153,13 @@ class ConsolidationMission:
         # Live inventory can change between task generation and auction.
         for task in list(manager.pending_tasks):
             source, dest = self.warehouse.get_slot(task.pickup_slot_id), self.warehouse.get_slot(task.dropoff_slot_id)
+            if task.reservations_released:
+                continue  # Phase 7 holds this original task pending valid claims.
+            if task.recovery_required:
+                if dest['state'] != 'reserved' or dest['task_id'] != task.id:
+                    self.status, self.message = 'blocked', 'Recovery destination reservation unavailable; cargo retained on failed robot'
+                    return
+                continue  # Source is already empty; cargo is on its failed owner.
             if source['state'] != 'stored' or source['cargo_id'] != task.cargo_id or source['task_id'] != task.id:
                 self.fail_uncollected(task, robots, 'Source carton unavailable')
             elif dest['state'] != 'reserved' or dest['task_id'] != task.id:
@@ -202,6 +211,11 @@ class ConsolidationMission:
         else:
             self.status, self.message = 'running', 'Fleet auction → pickup → transport → placement'
         self.robots_used.update(t.assigned_to for t in manager.active_tasks + manager.completed_tasks if t.assigned_to is not None)
+        recovering = [t for t in manager.pending_tasks + manager.active_tasks
+                      if t.recovery_required or t.reservations_released]
+        if recovering:
+            self.status = 'recovering' if any(t.recovery_robot_id is not None for t in recovering) else 'recovery_pending'
+            self.message = 'Cargo recovery required; original tasks/destinations retained. Awaiting a connected, reachable recovery robot.'
 
     def timeout(self):
         if self.started and self.status != 'completed':

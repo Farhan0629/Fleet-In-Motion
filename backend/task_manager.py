@@ -90,12 +90,20 @@ class Task:
         self.failure_reason = None
         self.picked_up = False
         self.cargo_id = self.id
+        self.cargo_owner = f"rack:{self.pickup_slot_code}" if pickup_slot else f"table:{self.table_code}"
+        self.cargo_state = "stored" if pickup_slot else "staged"
+        self.recovery_required = False
+        self.recovery_cell = None
+        self.recovery_cargo_position = None
+        self.failed_robot_id = None
+        self.recovery_robot_id = None
+        self.reservations_released = False
         self.source_rack = pickup_slot["island"] if pickup_slot else None
         self.destination_rack = dropoff_slot["island"] if dropoff_slot else None
 
     def as_payload(self) -> dict:
         """What a robot (and the 3D view) needs to know about this carton."""
-        return {
+        payload = {
             "id": self.id,
             "cargo_id": self.cargo_id,
             "source_rack": self.source_rack,
@@ -129,6 +137,15 @@ class Task:
             "max_retries": self.max_retries,
             "dynamic": self.dynamic,
         }
+        payload.update(failed_robot_id=self.failed_robot_id,
+                       recovery_required=self.recovery_required,
+                       recovery_cell=self.recovery_cell,
+                       recovery_cargo_position=self.recovery_cargo_position)
+        if self.recovery_required:
+            payload.update(pickup_kind="recovery", pickup_slot_cell=None,
+                           pickup_slot_code=None, pickup_slot_id=None)
+        return payload
+
 
 
 class TaskManager:
@@ -156,6 +173,8 @@ class TaskManager:
         self.stored_count = 0
         from consolidation import ConsolidationMission
         self.consolidation = ConsolidationMission(self)
+        from resilience import FleetResilience
+        self.resilience = FleetResilience(self)
 
     def _choose_slot(self, index: int, pickup: tuple[int, int]) -> dict | None:
         """Reserve an empty rack slot for the carton staged at `pickup`.
@@ -330,6 +349,7 @@ class TaskManager:
         task.status = "cancelled"
         task.failure_reason = "cancelled by operator"
         self.cancelled_tasks.append(task)
+        self.resilience.cancelled(task)
         return task
 
     def reassign_task(self, task_id: int, robots: list) -> Task:
@@ -413,12 +433,18 @@ class TaskManager:
         # 2. Allocate pending tasks to highest bidding idle robots
         self._sort_pending()
         for task in self.pending_tasks[:]:
-            payload = task.as_payload()
             bids = {}
+            payloads = {}
             for robot in robots:
+                if p2p_network.is_partitioned.get(robot.id, False):
+                    continue  # Offline peers cannot submit new bids over the mesh.
+                payload = self.resilience.auction_payload(task, robot)
+                if payload is None:
+                    continue
                 bid = robot.calculate_bid(payload)
                 if bid > 0:
                     bids[robot.id] = bid
+                    payloads[robot.id] = payload
 
             if not bids:
                 continue
@@ -426,6 +452,7 @@ class TaskManager:
             # Winner = highest bid, tiebreak by lowest robot ID
             winner_id = max(bids, key=lambda rid: (bids[rid], -rid))
 
+            payload = payloads[winner_id]
             task.assigned_to = winner_id
             task.status = "assigned"
             self.pending_tasks.remove(task)
@@ -436,6 +463,7 @@ class TaskManager:
                 if robot.id == winner_id:
                     winner = robot
                     robot.assign_task(dict(payload))
+                    self.resilience.assigned(task, robot, tick)
                     break
 
             p2p_network.broadcast(winner_id, "result", {
@@ -481,13 +509,15 @@ class TaskManager:
             if source["state"] != "stored" or source["cargo_id"] != task.cargo_id or source["task_id"] != task.id:
                 return False
         task.picked_up = True
+        task.cargo_owner = f"robot:{task.assigned_to}"
+        task.cargo_state = "pickup_transfer"
         if task.pickup_kind == "table":
             return self.warehouse.mark_table_empty(task.pickup)
         if task.pickup_slot_id is not None:
             return self.warehouse.release_slot(task.pickup_slot_id)
         return False
 
-    def complete_leg(self, task_id: int):
+    def complete_leg(self, task_id: int, tick: int = 0):
         """Finish the leg a unit just completed.
 
         Returns ("stored", task) when a carton was put away in its rack slot,
@@ -514,6 +544,7 @@ class TaskManager:
             task.status = "completed"
             self.active_tasks.remove(task)
             self.completed_tasks.append(task)
+            self.resilience.delivered(task, tick)
             return outcome, task
         return None, None
 
@@ -525,6 +556,11 @@ class TaskManager:
         row = {
             "id": task.id,
             "cargo_id": task.cargo_id,
+            "cargo_owner": task.cargo_owner,
+            "cargo_state": task.cargo_state,
+            "recovery_required": task.recovery_required,
+            "recovery_robot_id": task.recovery_robot_id,
+            "failed_robot_id": task.failed_robot_id,
             "source_rack": task.source_rack,
             "destination_rack": task.destination_rack,
             "picked_up": task.picked_up,
@@ -564,6 +600,7 @@ class TaskManager:
         """Serialize task state for WebSocket."""
         return {
             "consolidation": self.consolidation.to_dict(),
+            "resilience": self.resilience.to_dict(),
             "pending": [self._serialize(t) for t in self.pending_tasks],
             "active": [self._serialize(t, with_owner=True) for t in self.active_tasks],
             "completed": [self._serialize(t) for t in self.completed_tasks[-20:]],

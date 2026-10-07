@@ -228,3 +228,19 @@ Consolidation and inventory-conservation tests pass on WH1 (4 slots), WH2 (6) an
 WH3 (8), with zero collisions/deadlocks. WebSocket tests also exercise default
 batteries, fleet parking and the original putaway start command. Frontend tests
 and production build pass. See PHASE6_DYNAMIC_TASKS.md. No Phase 7 work included.
+
+
+## Phase 7 — Fleet resilience and recovery
+
+Extended the working consolidation queue with original-task failure recovery.
+Before pickup, claims are released/revalidated and the existing auction selects
+another robot. Carrying failure freezes the real owner/body, retains the original
+target reservation and performs an adjacent animated handoff before delivery.
+Stable cargo identity and inventory conservation remain intact.
+
+Extended existing P2P partitions with local mode, stale-connection/motion rejection
+and bidirectional current position/task/cargo/destination/charger reconciliation.
+Added a compact, state-valid resilience drill panel and measured recovery counters.
+No second allocator/network or warehouse-specific recovery logic. No ROS2, physical
+control, scalability, consensus or Phase 8 work. See PHASE7_RESILIENCE.md for flows,
+functional test results and scope boundaries.

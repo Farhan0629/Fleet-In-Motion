@@ -92,7 +92,7 @@ export default function RobotStatus({ robot }) {
       </p>
       <button
         type="button"
-        disabled={robot.has_cargo || Boolean(robot.handling)}
+        disabled={robot.failed || robot.has_cargo || Boolean(robot.handling)}
         onClick={() => sendCommand('set_robot_available', { robot_id: robot.id, available: robot.available === false })}
         className="mt-2 min-h-9 w-full rounded-md border border-slate-300 px-2 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         title={robot.has_cargo || robot.handling ? 'Complete the current transfer first' : ''}

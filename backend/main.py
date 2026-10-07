@@ -201,6 +201,7 @@ async def simulation_loop():
         sim_state["tick"] += 1
         tick = sim_state["tick"]
         metrics.episode_ticks = tick
+        task_manager.resilience.refresh(robots, p2p_network, tick)
         task_manager.consolidation.refresh(robots, tick)
         if task_manager.consolidation.status == "blocked":
             sim_state["paused"] = True
@@ -221,7 +222,7 @@ async def simulation_loop():
                 event_logger.add_event("pickup", f"{robot.name} secured package #{leg['id']} from {source}", robot_id=robot.id, tick=tick)
             elif action == "delivered":
                 if robot.last_delivered_task_id:
-                    outcome, task = task_manager.complete_leg(robot.last_delivered_task_id)
+                    outcome, task = task_manager.complete_leg(robot.last_delivered_task_id, tick=tick)
                     if outcome == "stored":
                         metrics.record_storage()
                         metrics.record_task_completion(tick)
@@ -246,6 +247,7 @@ async def simulation_loop():
                 event_logger.add_event("yield", f"{robot.name} stepped aside to clear a bottleneck", robot_id=robot.id, tick=tick)
             elif action == "waited" and robot.consecutive_waits == 1:
                 event_logger.add_event("yield", f"{robot.name} yielding at ({robot.x},{robot.y})", robot_id=robot.id, tick=tick)
+            task_manager.resilience.action(robot, action, robots, p2p_network, tick)
         for _ in detect_collisions(robots):
             metrics.record_collision()
             if task_manager.consolidation.enabled and task_manager.consolidation.status != "completed":
@@ -266,7 +268,7 @@ async def simulation_loop():
                 event_logger.add_event("system", f"All {mission_size} active missions are complete after {tick} ticks \\u2014 fleet heading to the charging pads", tick=tick)
             for robot in robots:
                 robot.park_for_charging(p2p_network, tick, event_logger)
-        fleet_parked = all(getattr(robot, "parked", False) for robot in robots) if END_OF_ROUND_CHARGE else True
+        fleet_parked = all(getattr(robot, "parked", False) or getattr(robot, "failed", False) for robot in robots) if END_OF_ROUND_CHARGE else True
         if (round_done and fleet_parked) or tick - episode_start >= MAX_TICKS:
             sim_state["running"] = False
             if not round_done:
@@ -408,14 +410,28 @@ async def websocket_endpoint(ws: WebSocket):
                     warehouse.blocked_cells.clear()
                     event_logger.add_event("hazard", f"{cleared} blocked aisle cell(s) cleared" if cleared else "No blocked aisles to clear", tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
-                elif action == "toggle_partition":
+                elif action in ("simulate_robot_failure", "restore_robot"):
                     robot = find_robot(int(command["robot_id"]))
-                    if p2p_network.is_partitioned.get(robot.id, False):
-                        p2p_network.restore_robot(robot.id)
-                        event_logger.add_event("system", f"{robot.name} reconnected to the mesh", robot_id=robot.id, tick=sim_state["tick"])
+                    if action == "simulate_robot_failure":
+                        if not sim_state["running"]:
+                            raise ValueError("Start consolidation before a robot failure drill")
+                        task = task_manager.resilience.fail_robot(robot, robots, p2p_network, sim_state["tick"])
+                        event_logger.add_event("hazard", f"{robot.name} FAILED; task #{task.id}, cargo {task.cargo_id}: {task.status}", robot_id=robot.id, tick=sim_state["tick"])
                     else:
-                        p2p_network.partition_robot(robot.id)
-                        event_logger.add_event("hazard", f"{robot.name} lost radio in a Wi-Fi dead zone - navigating on onboard sensors only", robot_id=robot.id, tick=sim_state["tick"])
+                        task_manager.resilience.restore_robot(robot, robots, p2p_network, sim_state["tick"])
+                        event_logger.add_event("system", f"{robot.name} restored at its actual location", robot_id=robot.id, tick=sim_state["tick"])
+                    await broadcast_state(build_state_message(sim_state["tick"]))
+                elif action in ("toggle_partition", "simulate_communication_loss", "restore_communication"):
+                    robot = find_robot(int(command["robot_id"]))
+                    if action == "simulate_communication_loss" and (not sim_state["running"] or not task_manager.consolidation.started or task_manager.consolidation.status == "completed"):
+                        raise ValueError("Communication drills require active consolidation")
+                    restore = action == "restore_communication" or (action == "toggle_partition" and p2p_network.is_partitioned.get(robot.id, False))
+                    if restore:
+                        task_manager.resilience.restore_communication(robot, robots, p2p_network, sim_state["tick"])
+                        event_logger.add_event("system", f"{robot.name} reconnected; position, task, cargo custody and destination reconciled", robot_id=robot.id, tick=sim_state["tick"])
+                    else:
+                        task_manager.resilience.lose_communication(robot, robots, p2p_network, sim_state["tick"])
+                        event_logger.add_event("hazard", f"{robot.name} NETWORK OFFLINE; local sensing mode, stale peer predictions invalidated", robot_id=robot.id, tick=sim_state["tick"])
                     await broadcast_state(build_state_message(sim_state["tick"]))
                 elif action == "boost_battery":
                     # Energy boost: max out a unit's battery to full charge.
@@ -464,6 +480,8 @@ async def websocket_endpoint(ws: WebSocket):
                 elif action == "set_robot_available":
                     robot = find_robot(int(command["robot_id"]))
                     available = bool(command.get("available"))
+                    if getattr(robot, "failed", False):
+                        raise ValueError("Use Restore Robot after cargo recovery, not availability controls")
                     task = next((t for t in task_manager.active_tasks if t.assigned_to == robot.id), None)
                     if not available and (robot.carrying or getattr(robot, "handling", None) or (task and task.picked_up)):
                         raise ValueError("This unit is carrying a carton; complete delivery before making it unavailable")

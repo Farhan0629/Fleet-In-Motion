@@ -8,8 +8,10 @@ export const STATUS_COPY = {
   idle: { label: 'Idle', tone: 'slate' }, moving_to_pickup: { label: 'To table', tone: 'amber' }, picking_up: { label: 'Lifting carton', tone: 'amber' }, moving_to_dropoff: { label: 'Carrying to rack', tone: 'cobalt' }, placing: { label: 'Placing carton', tone: 'green' }, waiting: { label: 'Waiting', tone: 'amber' }, yielding: { label: 'Yielding', tone: 'amber' }, charging: { label: 'Charging', tone: 'green' }, moving_to_charge: { label: 'To charge pad', tone: 'green' }, storing: { label: 'Storing in rack', tone: 'violet' }, retrieving: { label: 'Picking from rack', tone: 'violet' }, parked: { label: 'Parked \u00b7 charged', tone: 'green' },
 }
 export function getRobotStatusMeta(robot) {
+  if (robot?.failed) return { label: robot.has_cargo ? 'Failed · cargo recovery required' : 'Failed · awaiting restore', tone: 'rose' }
   if (robot?.navigation_message) return { label: robot.navigation_message, tone: 'rose' }
   if (robot?.handling) {
+    if (robot.handling.place === 'recovery') return { label: 'Recovering cargo · physical handoff', tone: 'amber' }
     if (robot.handling.place === 'rack') return STATUS_COPY[robot.handling.kind === 'pickup' ? 'retrieving' : 'storing']
     return STATUS_COPY[robot.handling.kind === 'pickup' ? 'picking_up' : 'placing']
   }
@@ -21,12 +23,14 @@ export function getRobotStatusMeta(robot) {
   return STATUS_COPY[robot?.status] || { label: robot?.status || 'Unknown', tone: 'slate' }
 }
 export function getRobotNextDestination(robot) {
+  if (robot?.failed) return robot.has_cargo ? { type: 'RECOVERY REQUIRED', coordinate: [robot.x, robot.y] } : null
   if (robot?.charger && !robot?.task && !robot?.parked) return { type: 'CHARGING', coordinate: robot.charger }
   if (robot?.status === 'moving_to_charge' && robot.planned_path?.length) return { type: 'CHARGING', coordinate: robot.planned_path[robot.planned_path.length - 1] }
   if ((robot?.status === 'charging' || robot?.parked) && robot?.charger) return { type: robot.parked ? 'PARKED' : 'CHARGING', coordinate: robot.charger }
   if (!robot?.task) return null
   const coordinate = robot.has_cargo ? robot.task.dropoff : robot.task.pickup
   const kind = robot.has_cargo ? robot.task.dropoff_kind : robot.task.pickup_kind
+  if (kind === 'recovery') return { type: `RECOVERY · robot ${robot.task.failed_robot_id}`, coordinate }
   if (kind === 'rack') { const code = robot.has_cargo ? robot.task.dropoff_slot_code || robot.task.slot_code : robot.task.pickup_slot_code || robot.task.slot_code; return { type: code ? `RACK ${code}` : 'RACK', coordinate } }
   return { type: robot.task.table_code ? `TABLE ${robot.task.table_code}` : 'TABLE', coordinate }
 }

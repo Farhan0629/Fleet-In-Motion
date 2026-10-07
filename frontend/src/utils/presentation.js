@@ -79,6 +79,7 @@ export function advanceMotion(m, delta, paused = false) {
 // `station` is where the package rests when it is not in the robot's hands: a
 // loading/delivery table by default, or a rack deck during a storage transfer.
 export function transferPose(handling, station = STATION) {
+  station = handling?.handoff_station || station
   if (!handling) return { position: [...CARRY], reach: 0, label: 'Transporting' }
   const p = clamp(handling.progress || 0)
   const lift = smooth((p - 0.25) / 0.5)

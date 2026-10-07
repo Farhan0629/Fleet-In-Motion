@@ -50,6 +50,9 @@ class Robot:
         self.known_peer_intent_ticks = {}
         self.available = True
         self.availability_reason = None
+        self.communication_mode = "online"
+        self.known_peer_states = {}
+        self.known_peer_state_versions = {}
         
         # Energy state. `target_charger` is the pad this unit has claimed over
         # the mesh; it survives transient "waiting" states, so a unit that is
@@ -93,6 +96,7 @@ class Robot:
         start_time = time.perf_counter()
         
         self._current_tick = current_tick
+        self.communication_mode = "local" if getattr(p2p_network, "is_partitioned", {}).get(self.id, False) else "online"
         if not self.available:
             self.prev_x, self.prev_y = self.x, self.y
             return "unavailable"
@@ -166,7 +170,23 @@ class Robot:
     
     def _process_messages(self, messages, event_logger=None, tick: int = 0):
         for msg in messages:
-            if msg.msg_type == "pos":
+            if msg.msg_type in ("pos", "intent"):
+                version = (getattr(msg, "epoch", 0), msg.payload.get("tick", tick))
+                if version < self.known_peer_state_versions.get(msg.sender_id, (-1, -1)):
+                    continue  # Motion packets cannot predate reconciled truth.
+            if msg.msg_type == "state_sync":
+                version = (getattr(msg, "epoch", 0), msg.payload.get("tick", tick))
+                if version < self.known_peer_state_versions.get(msg.sender_id, (-1, -1)):
+                    continue
+                self.forget_peer(msg.sender_id)
+                self.known_peer_state_versions[msg.sender_id] = version
+                self.known_peer_states[msg.sender_id] = dict(msg.payload)
+                self.known_peer_positions[msg.sender_id] = (msg.payload["x"], msg.payload["y"], msg.payload.get("tick", tick))
+                if msg.payload.get("charger") is not None:
+                    self.known_charger_claims[tuple(msg.payload["charger"])] = (msg.sender_id, msg.payload.get("charger_cost", 0))
+                # Snapshot updates position/custody; only fresh intent packets
+                # may populate motion predictions after reconnect.
+            elif msg.msg_type == "pos":
                 if msg.payload.get("tick", tick) < self.known_peer_positions.get(msg.sender_id, (0, 0, -1))[2]:
                     continue
                 self.known_peer_positions[msg.sender_id] = (
@@ -499,7 +519,23 @@ class Robot:
 
         return "moved"
     
+    def forget_peer(self, peer_id):
+        for knowledge in (self.known_peer_positions, self.known_peer_intents,
+                          self.known_peer_intent_ticks, self.known_peer_dists,
+                          self.known_peer_states):
+            knowledge.pop(peer_id, None)
+        self.known_charger_claims = {cell: claim for cell, claim in self.known_charger_claims.items() if claim[0] != peer_id}
+
+    def clear_peer_knowledge(self):
+        peers = set(self.known_peer_positions) | set(self.known_peer_intents) | set(self.known_peer_states)
+        for peer_id in peers:
+            self.forget_peer(peer_id)
+        self.known_charger_claims.clear()
+
     def _expire_peer_memory(self, tick):
+        for peer_id, state in list(self.known_peer_states.items()):
+            if tick - state.get("tick", tick) > PEER_MEMORY_TICKS:
+                self.known_peer_states.pop(peer_id, None)
         for peer_id, info in list(self.known_peer_positions.items()):
             if tick - info[2] > PEER_MEMORY_TICKS:
                 self.known_peer_positions.pop(peer_id, None)
@@ -761,6 +797,8 @@ class Robot:
             "status": status_str,
             "available": self.available,
             "availability_reason": self.availability_reason,
+            "communication_mode": self.communication_mode,
+            "peer_states": dict(self.known_peer_states),
             "navigation_message": self.navigation_message,
             "navigation_blocked_reason": self.navigation_blocked_reason,
             "is_yielding": getattr(self, "is_yielding", False),

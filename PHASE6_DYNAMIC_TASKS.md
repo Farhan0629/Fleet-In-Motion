@@ -75,9 +75,11 @@ capacity in data does not change the mission implementation.
   dashboard's **Resume retained mission** continues without inventory reset.
 - Robot-local blocked-route telemetry remains visible for mid-mission barriers.
 
-Forced mid-carry robot failure/recovery is not implemented. No Phase 7 work was
-started. `robot.py`, `pathfinding.py`, `p2p.py`, `collision.py`, `baseline.py` and
-`config.py` are unchanged. Presentation handling only gained cargo-ID telemetry.
+At the Phase 6 boundary, forced mid-carry recovery was deliberately excluded and
+core intelligence was unchanged. Phase 7 now extends this working flow with robot
+failure, adjacent physical handoff and P2P reconciliation; see
+[PHASE7_RESILIENCE.md](./PHASE7_RESILIENCE.md). The consolidation policy and
+warehouse definitions remain unchanged.
 
 ## Verification
 

@@ -3,6 +3,7 @@ import Controls from './Controls'
 import RobotStatus from './RobotStatus'
 import MetricsPanel from './MetricsPanel'
 import TaskQueue from './TaskQueue'
+import ResiliencePanel from './ResiliencePanel'
 import EventLog from './EventLog'
 import { getMissionSummary, getRobotNextDestination } from '../utils/simulationState.js'
 
@@ -20,7 +21,7 @@ function SelectedInspector({ robot, offline }) {
           </p>
           <p className="text-xs text-slate-600">Status: {robot.status}</p>
           <p className="text-xs text-slate-600">
-            Cargo: {robot.has_cargo ? `PKG-${String(robot.carrying_task_id || robot.task?.id || 0).padStart(3, '0')}` : 'None'}
+            Cargo: {robot.has_cargo ? robot.task?.cargo_id || `PKG-${String(robot.carrying_task_id || robot.task?.id || 0).padStart(3, '0')}` : 'None'}
             {robot.task?.table_code ? ` · from table ${robot.task.table_code}` : ''}
             {robot.task?.slot_code ? ` · to rack slot ${robot.task.slot_code}` : ''}
           </p>
@@ -80,6 +81,7 @@ export default function Dashboard() {
       )}
 
       <Controls />
+      <ResiliencePanel />
       <SelectedInspector robot={selectedRobot} offline={selectedRobot ? partitioned.includes(selectedRobot.id) : false} />
       <MetricsPanel />
 

@@ -45,7 +45,8 @@ This is currently a **software simulation**. It is not a ROS2 driver, a physical
 - Static putaway demonstrations and dynamic rack consolidation.
 - Deterministic inventory selection, existing bid assignment, completion, cancellation and uncollected-task reauction.
 - Temporary aisle barriers and dynamic replanning.
-- Simulated radio partitions with local occupancy sensing fallback.
+- Simulated radio partitions with local sensing fallback and bidirectional state reconciliation.
+- Before-pickup robot failure reauction and carrying failure with adjacent physical cargo recovery.
 - Addressable rack slots with reservation, storage, pickup, and physical carton ownership.
 - Compiler checks for connectivity, station access, rack access, chargers, spawns, and visual/navigation footprint agreement.
 - WebSocket telemetry and operator commands.
@@ -54,14 +55,14 @@ This is currently a **software simulation**. It is not a ROS2 driver, a physical
 
 ### Deliberately not implemented yet
 
-- Forced recovery from a robot that fails while physically carrying a carton.
+- Mechanical repair/towing and failures during in-progress lift/place/handoff dwell.
 - General station outage and charging-station outage policies.
 - Validated 5/10/25-robot scalability results.
 - A general CAD, occupancy-map, or arbitrary 3D-model importer.
 - ROS2/Nav2 adapters or commands to physical robots.
 - Production safety certification or real sensor integration.
 
-See [PHASE6_DYNAMIC_TASKS.md](./PHASE6_DYNAMIC_TASKS.md) for the dynamic-task boundary and [PHASE5_WAREHOUSE3.md](./PHASE5_WAREHOUSE3.md) for the Warehouse #3 validation history.
+See [PHASE7_RESILIENCE.md](./PHASE7_RESILIENCE.md) for failure/recovery and reconciliation, [PHASE6_DYNAMIC_TASKS.md](./PHASE6_DYNAMIC_TASKS.md) for the consolidation boundary and [PHASE5_WAREHOUSE3.md](./PHASE5_WAREHOUSE3.md) for the Warehouse #3 validation history.
 
 ---
 
@@ -309,6 +310,27 @@ The original **Start demonstration** remains the Phase 1–5 table putaway scena
 See [PHASE6_DYNAMIC_TASKS.md](./PHASE6_DYNAMIC_TASKS.md) for the data contract,
 selection policy, safety rules and verification results.
 
+### Fleet resilience and recovery
+
+During consolidation, select a robot in **Fleet resilience** and use the valid
+**Simulate Robot Failure**, **Simulate Communication Loss**, **Restore Robot** or
+**Restore Communication** controls. Pause or use 0.25x speed for a precise drill.
+Before-pickup failure releases/revalidates original claims and reauctions the same
+task. Carrying failure preserves cargo on the failed unit and reserves the original
+destination until a winning robot arrives beside it and performs an animated
+physical handoff. The existing auction, A*, P2P, rack placement and safety logic
+remain in use. In-progress transfers cannot be failed or remotely cancelled.
+
+Communication loss invalidates stale peer predictions and enters local sensing
+mode. Restoration exchanges current position, task, cargo ownership, destination
+and charger snapshots in both directions; old connection packets cannot resurrect
+old state. The existing Wi-Fi drill uses this same mechanism. Failed robots can be
+restored only after cargo/task release, at their unchanged actual coordinates.
+
+Live metrics count real failures, successful recoveries, recovered cargo, reauction
+assignments, link losses/reconciliations and failure-to-delivery ticks. See
+[PHASE7_RESILIENCE.md](./PHASE7_RESILIENCE.md) for states, tests and limitations.
+
 ---
 
 ## 8. Warehouse definition format
@@ -467,7 +489,11 @@ Send JSON objects with an `action` field:
 | `block_aisle` | optional `x`, `y` | Block a cell or auto-select a route cell |
 | `unblock_aisle` | `x`, `y` | Remove one barrier |
 | `clear_blocks` | — | Remove all temporary barriers |
-| `toggle_partition` | `robot_id` | Toggle simulated Wi-Fi loss |
+| `toggle_partition` | `robot_id` | Existing Wi-Fi loss/reconciliation toggle |
+| `simulate_robot_failure` | `robot_id` | Fail an active pre-pickup or carrying robot |
+| `restore_robot` | `robot_id` | Restore a failed robot after cargo/task release |
+| `simulate_communication_loss` | `robot_id` | Enter degraded local sensing mode |
+| `restore_communication` | `robot_id` | Exchange fresh state and reconcile custody |
 | `boost_battery` | `robot_id` | Set one robot to full charge |
 | `prepare_consolidation` | — | Explicitly load warehouse-defined stored inventory while stopped |
 | `fill_empty_rack` | — | Inspect inventory and start rack consolidation |
@@ -668,7 +694,7 @@ Open `http://localhost:8000`. The Docker build compiles the frontend and lets Fa
 - Local sensing uses simulated occupancy, not real LiDAR data.
 - Dynamic obstacles are operator-created grid barriers, not perception-generated obstacles.
 - Robot dynamics, acceleration, wheel slip, localization error and payload mass are not modeled.
-- A robot carrying cargo cannot currently be forcibly failed and reassigned without defining a physical handoff/recovery policy.
+- Recovery requires a reachable adjacent handoff position and the original destination reservation; failures during a physical transfer are rejected.
 - The frontend warehouse selector is currently a small explicit list and must be updated when adding another JSON definition.
 - Large-fleet scaling claims have not yet been validated.
 - ROS2, Nav2 and physical AMR adapters are future work.
@@ -681,7 +707,7 @@ These limitations are intentional and should remain explicit in demos, reports a
 
 The planned direction after the current warehouse and dynamic-task foundation is:
 
-1. reproducible robot/network/station failure scenarios;
+1. station-outage resilience beyond the completed robot/network recovery drills;
 2. configurable fleet-size scalability tests;
 3. automated warehouse × fleet × task × failure benchmarks;
 4. richer operational inspection and replay in the digital twin;
